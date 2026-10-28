@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -98,11 +99,23 @@ private fun TemperatureCard(
             .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
     ) {
-        Text(
-            text = formatTemperature(temperature),
-            style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Row {
+            Text(
+                text = temperature.valueC?.let { "$it°C" } ?: formatTemperature(temperature),
+                style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.alignByBaseline(),
+            )
+            if (temperature.valueC != null && temperature.valueF != null) {
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "/ ${temperature.valueF}°F",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
+        }
         if (temperature.context.isNotBlank()) {
             Spacer(Modifier.height(4.dp))
             Text(

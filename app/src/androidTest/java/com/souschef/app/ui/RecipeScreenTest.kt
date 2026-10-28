@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.souschef.app.data.Recipe
 import com.souschef.app.data.Step
@@ -164,6 +165,30 @@ class RecipeScreenTest {
     }
 
     @Test
+    fun temperature_shows_fahrenheit_as_secondary() {
+        setRecipeScreen(sampleRecipe(), initialTab = RecipeTab.Times)
+        composeRule.onNodeWithText("160°C").assertIsDisplayed()
+        composeRule.onNodeWithText("/ 320°F").assertIsDisplayed()
+        composeRule.onNodeWithText("160°C / 320°F").assertDoesNotExist()
+    }
+
+    @Test
+    fun temperatures_without_celsius_have_no_dangling_slash() {
+        setRecipeScreen(
+            sampleRecipe().copy(
+                temperatures = listOf(
+                    Temperature(null, 320, "320°F", "Heat the oven.", 0),
+                    Temperature(null, null, "gas mark 4", "Heat the oven slowly.", 1),
+                ),
+            ),
+            initialTab = RecipeTab.Times,
+        )
+        composeRule.onNodeWithText("320°F").assertIsDisplayed()
+        composeRule.onNodeWithText("gas mark 4").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("/ ", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun no_temperatures_shows_empty_copy() {
         setRecipeScreen(sampleRecipe().copy(temperatures = emptyList()), initialTab = RecipeTab.Times)
         composeRule.onNodeWithText("No oven temperatures found in this recipe.").assertIsDisplayed()
@@ -178,9 +203,11 @@ class RecipeScreenTest {
             initialTab = RecipeTab.Shopping,
             onAddToShopping = { added = it },
             onOpenShopping = { opened = true },
+            shoppingCount = 2,
         )
         composeRule.onNodeWithText("Add all ingredients").performClick()
         assertEquals(listOf("2 tbsp olive oil", "1kg beef shin"), added)
+        composeRule.onNodeWithText("2 items on the shopping list").assertIsDisplayed()
         composeRule.onNodeWithText("View list").performClick()
         assertTrue(opened)
     }
@@ -211,6 +238,7 @@ class RecipeScreenTest {
         addedShoppingTexts: Set<String> = emptySet(),
         onAddToShopping: (List<String>) -> Unit = {},
         onOpenShopping: () -> Unit = {},
+        shoppingCount: Int = 0,
     ): MutableState<Recipe> {
         val current = mutableStateOf(recipe)
         composeRule.setContent {
@@ -246,6 +274,7 @@ class RecipeScreenTest {
                     addedShoppingTexts = addedShoppingTexts,
                     onAddToShopping = onAddToShopping,
                     onOpenShopping = onOpenShopping,
+                    shoppingCount = shoppingCount,
                 )
             }
         }

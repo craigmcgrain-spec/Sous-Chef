@@ -35,7 +35,7 @@ fun ShoppingTab(
     addedTexts: Set<String>,
     onAdd: (List<String>) -> Unit,
     onOpenShopping: () -> Unit,
-    shoppingCount: Int = addedTexts.size,
+    shoppingCount: Int,
 ) {
     Column(
         modifier = Modifier

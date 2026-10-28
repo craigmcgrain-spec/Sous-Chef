@@ -94,7 +94,7 @@ fun RecipeScreen(
     addedShoppingTexts: Set<String>,
     onAddToShopping: (List<String>) -> Unit,
     onOpenShopping: () -> Unit,
-    shoppingCount: Int = addedShoppingTexts.size,
+    shoppingCount: Int,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     var highlightStep by rememberSaveable { mutableStateOf<Int?>(null) }

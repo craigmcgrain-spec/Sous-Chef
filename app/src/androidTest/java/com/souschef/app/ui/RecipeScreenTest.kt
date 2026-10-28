@@ -5,10 +5,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -73,6 +77,15 @@ class RecipeScreenTest {
         composeRule.onNodeWithText("No ingredients saved for this recipe.").assertIsDisplayed()
         composeRule.onNodeWithText("STEPS").performClick()
         composeRule.onNodeWithText("No steps saved for this recipe.").assertIsDisplayed()
+    }
+
+    @Test
+    fun overflow_menu_uses_the_palette_surface() {
+        setRecipeScreen(sampleRecipe())
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        val menu = composeRule.onNode(isPopup()).captureToImage().toPixelMap()
+        val rgb = menu[menu.width - 8, menu.height / 2].toArgb() and 0xFFFFFF
+        assertEquals(0xFFFDF8, rgb)
     }
 
     @Test

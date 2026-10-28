@@ -81,6 +81,7 @@ private class FakeStore : RecipeStore {
     override suspend fun findByUrl(url: String): Recipe? = seeded.value.firstOrNull { it.url == url }
 
     override suspend fun update(recipe: Recipe) = error("not used")
+    override suspend fun update(id: String, transform: (Recipe) -> Recipe) = error("not used")
     override suspend fun delete(id: String) = error("not used")
     override suspend fun addToShopping(recipe: Recipe, texts: List<String>) = error("not used")
     override suspend fun toggleShoppingItem(id: String) = error("not used")

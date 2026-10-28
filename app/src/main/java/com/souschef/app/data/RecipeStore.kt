@@ -18,6 +18,9 @@ interface RecipeStore {
     val shopping: Flow<List<ShoppingItem>>
     suspend fun save(recipe: Recipe)
     suspend fun update(recipe: Recipe)
+
+    /** Atomic read-modify-write: [transform] runs on the stored copy under the write lock. */
+    suspend fun update(id: String, transform: (Recipe) -> Recipe)
     suspend fun delete(id: String)
     suspend fun findByUrl(url: String): Recipe?
     suspend fun addToShopping(recipe: Recipe, texts: List<String>)
@@ -51,6 +54,10 @@ class DataStoreRecipeStore(
     }
 
     override suspend fun update(recipe: Recipe) = save(recipe)
+
+    override suspend fun update(id: String, transform: (Recipe) -> Recipe) = mutateRecipes { current ->
+        current.map { if (it.id == id) transform(it) else it }
+    }
 
     override suspend fun delete(id: String) = mutateRecipes { current ->
         current.filterNot { it.id == id }

@@ -55,7 +55,6 @@ class RecipeViewModel(
     }
 
     private fun toggle(transform: (Recipe) -> Recipe) {
-        val current = recipe.value ?: return
-        viewModelScope.launch { store.update(transform(current)) }
+        viewModelScope.launch { store.update(recipeId, transform) }
     }
 }

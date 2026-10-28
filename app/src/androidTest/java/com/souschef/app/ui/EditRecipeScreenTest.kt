@@ -2,6 +2,7 @@ package com.souschef.app.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -20,6 +21,7 @@ import com.souschef.app.sampleRecipe
 import com.souschef.app.ui.edit.EditRecipeScreen
 import com.souschef.app.ui.theme.SousChefTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -119,6 +121,47 @@ class EditRecipeScreenTest {
     }
 
     @Test
+    fun drag_reorders_the_first_row_two_slots() {
+        val recipe = sampleRecipe().copy(
+            steps = listOf(
+                Step("s-1", "A", checked = false),
+                Step("s-2", "B", checked = false),
+                Step("s-3", "C", checked = false),
+            ),
+        )
+        var saved: Recipe? = null
+        setEditScreen(recipe, onSave = { saved = it })
+
+        val handle = composeRule.onNodeWithContentDescription("Reorder step A").performScrollTo()
+        handle.performTouchInput { down(center) }
+        handle.performTouchInput {
+            advanceEventTime(700)
+            moveBy(Offset(0f, 1f))
+        }
+        composeRule.waitForIdle()
+        handle.performTouchInput { moveBy(Offset(0f, 90f)) }
+        composeRule.waitForIdle()
+        handle.performTouchInput { moveBy(Offset(0f, 90f)) }
+        composeRule.waitForIdle()
+        handle.performTouchInput { up() }
+        composeRule.onNodeWithText("Save").performClick()
+
+        assertEquals(listOf("B", "C", "A"), saved?.steps?.map { it.text })
+    }
+
+    @Test
+    fun back_cannot_discard_while_saving() {
+        var cancelled = false
+        setEditScreen(sampleRecipe(), saving = true, onCancel = { cancelled = true })
+
+        field(0).performTextInput("!")
+        composeRule.onNodeWithContentDescription("Back").assertIsNotEnabled()
+
+        composeRule.onNodeWithText("Discard changes?").assertDoesNotExist()
+        assertFalse(cancelled)
+    }
+
+    @Test
     fun back_with_changes_asks_to_discard() {
         var cancelled = false
         setEditScreen(sampleRecipe(), onCancel = { cancelled = true })
@@ -146,6 +189,7 @@ class EditRecipeScreenTest {
 
     private fun setEditScreen(
         recipe: Recipe,
+        saving: Boolean = false,
         onCancel: () -> Unit = {},
         onSave: (Recipe) -> Unit = {},
     ) {
@@ -153,7 +197,7 @@ class EditRecipeScreenTest {
             SousChefTheme {
                 EditRecipeScreen(
                     recipe = recipe,
-                    saving = false,
+                    saving = saving,
                     onCancel = onCancel,
                     onSave = onSave,
                 )

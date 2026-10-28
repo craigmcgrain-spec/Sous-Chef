@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -123,7 +124,7 @@ fun EditRecipeScreen(
         steps = moveItem(steps, from, to)
     }
 
-    BackHandler { cancel() }
+    BackHandler(enabled = !saving) { cancel() }
 
     Box(
         modifier = Modifier
@@ -177,34 +178,38 @@ fun EditRecipeScreen(
                 }
                 SectionLabel(stringResource(R.string.tab_ingredients))
                 ingredients.forEachIndexed { index, line ->
-                    LineRow(
-                        line = line,
-                        index = index,
-                        keys = ingredients.map { it.id },
-                        reorder = ingredientReorder,
-                        reorderLabel = stringResource(R.string.reorder_ingredient, line.text),
-                        removeLabel = stringResource(R.string.remove_ingredient, line.text),
-                        placeholder = stringResource(R.string.field_ingredient),
-                        onTextChange = { text -> ingredients = ingredients.replaceAt(index, line.copy(text = text)) },
-                        onRemove = { ingredients = ingredients.filterIndexed { i, _ -> i != index } },
-                    )
+                    key(line.id) {
+                        LineRow(
+                            line = line,
+                            index = index,
+                            keys = ingredients.map { it.id },
+                            reorder = ingredientReorder,
+                            reorderLabel = stringResource(R.string.reorder_ingredient, line.text),
+                            removeLabel = stringResource(R.string.remove_ingredient, line.text),
+                            placeholder = stringResource(R.string.field_ingredient),
+                            onTextChange = { text -> ingredients = ingredients.replaceAt(index, line.copy(text = text)) },
+                            onRemove = { ingredients = ingredients.filterIndexed { i, _ -> i != index } },
+                        )
+                    }
                 }
                 TextButton(onClick = { ingredients = ingredients + LineDraft(newId(), "", false) }) {
                     Text(stringResource(R.string.add_ingredient))
                 }
                 SectionLabel(stringResource(R.string.tab_steps))
                 steps.forEachIndexed { index, line ->
-                    LineRow(
-                        line = line,
-                        index = index,
-                        keys = steps.map { it.id },
-                        reorder = stepReorder,
-                        reorderLabel = stringResource(R.string.reorder_step, line.text),
-                        removeLabel = stringResource(R.string.remove_step, line.text),
-                        placeholder = stringResource(R.string.field_step),
-                        onTextChange = { text -> steps = steps.replaceAt(index, line.copy(text = text)) },
-                        onRemove = { steps = steps.filterIndexed { i, _ -> i != index } },
-                    )
+                    key(line.id) {
+                        LineRow(
+                            line = line,
+                            index = index,
+                            keys = steps.map { it.id },
+                            reorder = stepReorder,
+                            reorderLabel = stringResource(R.string.reorder_step, line.text),
+                            removeLabel = stringResource(R.string.remove_step, line.text),
+                            placeholder = stringResource(R.string.field_step),
+                            onTextChange = { text -> steps = steps.replaceAt(index, line.copy(text = text)) },
+                            onRemove = { steps = steps.filterIndexed { i, _ -> i != index } },
+                        )
+                    }
                 }
                 TextButton(onClick = { steps = steps + LineDraft(newId(), "", false) }) {
                     Text(stringResource(R.string.add_step))
@@ -248,7 +253,7 @@ private fun EditActions(saving: Boolean, onBack: () -> Unit, onSave: () -> Unit)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = !saving) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(R.string.back),

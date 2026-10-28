@@ -49,6 +49,12 @@ def test_supported_site_uses_scrapers_or_fallback():
     assert json.loads(extract(fixture("supported_site.html"), "https://www.allrecipes.com/recipe/1/x"))["title"] == "Test Cake"
 
 
+def test_supported_site_keeps_multiple_steps():
+    data = json.loads(extract(fixture("supported_site.html"), "https://www.allrecipes.com/recipe/1/x"))
+    assert data["steps"] == ["Heat the oven.", "Bake at 180C for 20 minutes."]
+    assert data["temperatures"][0]["stepIndex"] == 1
+
+
 def test_temperatures_ignore_grams_and_dedupe():
     temps = json.loads(temperatures_from_texts(["Add 180g flour.", "Bake at 180°C.", "Same oven: 180 C."]))
     assert [t["valueC"] for t in temps] == [180]
@@ -59,3 +65,23 @@ def test_temperature_variants():
     temps = json.loads(temperatures_from_texts(["Heat to 350 F.", "Gas mark 4.", "Fan 160°C."]))
     by_c = {t["valueC"] for t in temps}
     assert {177, 180}.issubset(by_c)
+
+
+def test_gas_mark_uses_specified_fahrenheit():
+    temps = json.loads(temperatures_from_texts(["Gas mark 4."]))
+    assert temps[0]["valueC"] == 180
+    assert temps[0]["valueF"] == 350
+
+
+def test_ingredient_temperatures_have_null_step_index():
+    data = json.loads(extract(fixture("ingredient_temperatures.html"), "https://example.com/x"))
+    ingredient_temps = [t for t in data["temperatures"] if t["stepIndex"] is None]
+    assert [t["valueC"] for t in ingredient_temps] == [180]
+    assert ingredient_temps[0]["context"] == "2 tbsp sugar for the 180C topping"
+
+
+def test_step_duplicate_beats_ingredient():
+    data = json.loads(extract(fixture("ingredient_temperatures.html"), "https://example.com/x"))
+    duplicates = [t for t in data["temperatures"] if t["valueC"] == 220]
+    assert len(duplicates) == 1
+    assert duplicates[0]["stepIndex"] == 1

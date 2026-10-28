@@ -19,7 +19,17 @@ _MISSING_FIELDS = (
 
 _TEMPERATURE_RE = re.compile(r"(?<!\d)(\d{1,4})\s*(?:°\s*([CF])?|([CF]))(?![A-Za-z])", re.IGNORECASE)
 _GAS_MARK_RE = re.compile(r"gas\s*mark\s*(\d+)", re.IGNORECASE)
-_GAS_MARK_CELSIUS = {1: 140, 2: 150, 3: 170, 4: 180, 5: 190, 6: 200, 7: 210, 8: 220, 9: 230}
+_GAS_MARK = {
+    1: (140, 275),
+    2: (150, 300),
+    3: (170, 325),
+    4: (180, 350),
+    5: (190, 375),
+    6: (200, 400),
+    7: (210, 425),
+    8: (220, 450),
+    9: (230, 475),
+}
 _NUMBERING_RE = re.compile(r"^\s*(?:step\s*\d+|\d+)\s*[.):](?=\s|$)\s*", re.IGNORECASE)
 _DURATION_RE = re.compile(r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$", re.IGNORECASE)
 
@@ -43,7 +53,7 @@ def extract(html: str, url: str) -> str:
     if not _is_recipe(data):
         raise ExtractionError("NO_RECIPE")
 
-    data["temperatures"] = _temperatures(data["steps"])
+    data["temperatures"] = _temperatures(data["steps"], data["ingredients"])
     data["missing"] = [field for field in _MISSING_FIELDS if data[field] is None]
     return json.dumps(data, ensure_ascii=False)
 
@@ -74,7 +84,7 @@ def _from_scraper(html, url):
         "cookMinutes": cook,
         "totalMinutes": _total(prep, cook, _minutes(_field(scraper, "total_time"))),
         "ingredients": _string_list(_field(scraper, "ingredients")),
-        "steps": _split_steps(_text(_field(scraper, "instructions"))),
+        "steps": _split_steps(_field(scraper, "instructions")),
     }
 
 
@@ -196,13 +206,13 @@ def _instruction_texts(value):
         return steps
     if isinstance(value, dict):
         if value.get("text"):
-            return _split_steps(_text(value["text"]))
+            return _split_steps(value["text"])
         return _instruction_texts(value.get("itemListElement") or [])
     return []
 
 
 def _split_steps(text):
-    if not text:
+    if not isinstance(text, str) or not text:
         return []
     lines = [" ".join(line.split()) for line in text.splitlines()]
     lines = [line for line in lines if line]
@@ -238,23 +248,31 @@ def _text(value):
     return " ".join(str(value).split()) if value is not None else ""
 
 
-def _temperatures(texts):
+def _temperatures(texts, ingredient_texts=()):
     temperatures = []
     seen = set()
     for index, text in enumerate(texts):
         if not text:
             continue
-        for match in _TEMPERATURE_RE.finditer(text):
-            amount = int(match.group(1))
-            if (match.group(2) or match.group(3) or "C").upper() == "C":
-                _add_temperature(temperatures, seen, amount, round(amount * 9 / 5 + 32), match.group(0), text, index)
-            else:
-                _add_temperature(temperatures, seen, round((amount - 32) * 5 / 9), amount, match.group(0), text, index)
-        for match in _GAS_MARK_RE.finditer(text):
-            celsius = _GAS_MARK_CELSIUS.get(int(match.group(1)))
-            if celsius is not None:
-                _add_temperature(temperatures, seen, celsius, round(celsius * 9 / 5 + 32), match.group(0), text, index)
+        _scan_temperatures(temperatures, seen, text, index)
+    for text in ingredient_texts:
+        if not text:
+            continue
+        _scan_temperatures(temperatures, seen, text, None)
     return temperatures
+
+
+def _scan_temperatures(temperatures, seen, text, step_index):
+    for match in _TEMPERATURE_RE.finditer(text):
+        amount = int(match.group(1))
+        if (match.group(2) or match.group(3) or "C").upper() == "C":
+            _add_temperature(temperatures, seen, amount, round(amount * 9 / 5 + 32), match.group(0), text, step_index)
+        else:
+            _add_temperature(temperatures, seen, round((amount - 32) * 5 / 9), amount, match.group(0), text, step_index)
+    for match in _GAS_MARK_RE.finditer(text):
+        values = _GAS_MARK.get(int(match.group(1)))
+        if values is not None:
+            _add_temperature(temperatures, seen, values[0], values[1], match.group(0), text, step_index)
 
 
 def _add_temperature(temperatures, seen, value_c, value_f, raw, context, step_index):

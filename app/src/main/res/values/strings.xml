@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sous Chef</string>
+    <string name="paste_link">Paste a link</string>
+    <string name="shopping_list">Shopping list</string>
+    <string name="more_options">More options</string>
+    <string name="library_empty_title">Nothing cooking yet</string>
+    <string name="library_empty_body">Share a recipe from your browser to save it here.</string>
+    <string name="state_done">Done</string>
+    <string name="state_not_done">Not done</string>
+
+    <plurals name="recipe_count">
+        <item quantity="one">%d recipe</item>
+        <item quantity="other">%d recipes</item>
+    </plurals>
+
+    <plurals name="shopping_badge">
+        <item quantity="one">%d unchecked item</item>
+        <item quantity="other">%d unchecked items</item>
+    </plurals>
 </resources>

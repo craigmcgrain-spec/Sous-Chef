@@ -26,4 +26,10 @@ class FormatTest {
         val recipe = sampleRecipe().copy(siteName = "BBC Good Food", servings = null, totalMinutes = 180)
         assertEquals("BBC Good Food · 3h", formatRecipeMeta(recipe))
     }
+
+    @Test
+    fun `library meta omits servings`() {
+        assertEquals("BBC Good Food · 3h 15m", formatLibraryMeta(sampleRecipe()))
+        assertEquals("3h 15m", formatLibraryMeta(sampleRecipe().copy(siteName = null, totalMinutes = null)))
+    }
 }

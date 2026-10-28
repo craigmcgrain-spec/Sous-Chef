@@ -19,14 +19,19 @@ fun formatTemperature(t: Temperature): String {
     return if (parts.isEmpty()) t.raw else parts.joinToString(" / ")
 }
 
-fun formatRecipeMeta(recipe: Recipe): String {
-    val minutes = recipe.totalMinutes ?: when {
-        recipe.prepMinutes == null && recipe.cookMinutes == null -> null
-        else -> (recipe.prepMinutes ?: 0) + (recipe.cookMinutes ?: 0)
-    }
-    return listOfNotNull(
-        recipe.siteName,
-        formatDuration(minutes),
-        recipe.servings?.let { "Serves $it" },
-    ).joinToString(" · ")
+fun formatRecipeMeta(recipe: Recipe): String = listOfNotNull(
+    recipe.siteName,
+    formatDuration(recipe.totalDurationMinutes()),
+    recipe.servings?.let { "Serves $it" },
+).joinToString(" · ")
+
+/** Library rows show source and time only; servings belong on the recipe screen. */
+fun formatLibraryMeta(recipe: Recipe): String = listOfNotNull(
+    recipe.siteName,
+    formatDuration(recipe.totalDurationMinutes()),
+).joinToString(" · ")
+
+private fun Recipe.totalDurationMinutes(): Int? = totalMinutes ?: when {
+    prepMinutes == null && cookMinutes == null -> null
+    else -> (prepMinutes ?: 0) + (cookMinutes ?: 0)
 }

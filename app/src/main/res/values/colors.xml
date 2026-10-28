@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="paper">#FAF5EB</color>
+    <color name="surface">#FFFDF8</color>
     <color name="ink">#211C18</color>
     <color name="terracotta">#B4442A</color>
+    <color name="launcher_background">#B4442A</color>
 </resources>

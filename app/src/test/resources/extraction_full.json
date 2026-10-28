@@ -1,0 +1,22 @@
+{
+  "title": "Sunday Ragù",
+  "author": "Anna Del Conte",
+  "siteName": "BBC Good Food",
+  "imageUrl": "https://example.com/ragu.jpg",
+  "servings": "4",
+  "prepMinutes": 15,
+  "cookMinutes": 180,
+  "totalMinutes": 195,
+  "ingredients": ["2 tbsp olive oil", "1kg beef shin"],
+  "steps": ["Heat the oven to 160°C.", "Brown the beef."],
+  "temperatures": [
+    {
+      "valueC": 160,
+      "valueF": 320,
+      "raw": "160°C",
+      "context": "Heat the oven to 160°C.",
+      "stepIndex": 0
+    }
+  ],
+  "missing": []
+}

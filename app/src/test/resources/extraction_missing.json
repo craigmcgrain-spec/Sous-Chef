@@ -1,0 +1,15 @@
+{
+  "title": "Toast",
+  "author": null,
+  "siteName": null,
+  "imageUrl": null,
+  "servings": null,
+  "prepMinutes": 2,
+  "cookMinutes": null,
+  "totalMinutes": null,
+  "ingredients": ["2 slices bread"],
+  "steps": ["Toast the bread."],
+  "temperatures": [],
+  "missing": ["author", "siteName", "imageUrl", "servings", "cookMinutes", "totalMinutes"],
+  "unexpectedField": { "nested": true }
+}

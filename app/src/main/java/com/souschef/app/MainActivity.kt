@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +75,11 @@ private fun SousChefNavHost(container: AppContainer) {
                 },
             )
             val recipe by recipeViewModel.recipe.collectAsStateWithLifecycle()
+            val shopping by recipeViewModel.shopping.collectAsStateWithLifecycle()
+            val addedShoppingTexts = remember(shopping, recipeId) {
+                shopping.filter { it.recipeId == recipeId }
+                    .mapTo(HashSet()) { it.text.trim() }
+            }
             var activeTab by rememberSaveable { mutableStateOf(RecipeTab.Ingredients.name) }
             recipe?.let { current ->
                 RecipeScreen(
@@ -85,11 +91,11 @@ private fun SousChefNavHost(container: AppContainer) {
                     onDelete = { recipeViewModel.delete { navController.popBackStack() } },
                     onToggleIngredient = recipeViewModel::toggleIngredient,
                     onToggleStep = recipeViewModel::toggleStep,
-                    // Task 10 switches to Steps and scrolls the chosen card.
-                    onJumpToStep = {},
-                    addedShoppingTexts = emptySet(),
+                    onJumpToStep = { activeTab = RecipeTab.Steps.name },
+                    addedShoppingTexts = addedShoppingTexts,
                     onAddToShopping = recipeViewModel::addToShopping,
                     onOpenShopping = { navController.navigate("shopping") },
+                    shoppingCount = shopping.size,
                 )
             }
         }

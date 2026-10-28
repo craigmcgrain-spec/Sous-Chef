@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +38,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -45,9 +50,17 @@ import androidx.compose.ui.unit.dp
 import com.souschef.app.R
 import com.souschef.app.data.Recipe
 import com.souschef.app.data.Step
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 @Composable
-fun StepsTab(recipe: Recipe, highlightStep: Int?, onToggle: (String) -> Unit) {
+fun StepsTab(
+    recipe: Recipe,
+    highlightStep: Int?,
+    onToggle: (String) -> Unit,
+    scrollState: LazyListState? = null,
+    contentTop: Float = 0f,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -83,12 +96,25 @@ fun StepsTab(recipe: Recipe, highlightStep: Int?, onToggle: (String) -> Unit) {
                 )
             }
             Spacer(Modifier.height(16.dp))
+            val density = LocalDensity.current
+            var highlightedTop by remember { mutableStateOf<Float?>(null) }
+            LaunchedEffect(highlightStep) {
+                if (highlightStep == null || scrollState == null || contentTop <= 0f) return@LaunchedEffect
+                val top = snapshotFlow { highlightedTop }.filterNotNull().first()
+                val margin = with(density) { 8.dp.toPx() }
+                scrollState.scrollBy(top - contentTop - margin)
+            }
             recipe.steps.forEachIndexed { index, step ->
                 StepCard(
                     number = index + 1,
                     step = step,
                     highlighted = highlightStep == index,
                     onToggle = onToggle,
+                    modifier = if (highlightStep == index) {
+                        Modifier.onGloballyPositioned { highlightedTop = it.positionInRoot().y }
+                    } else {
+                        Modifier
+                    },
                 )
                 if (index != recipe.steps.lastIndex) Spacer(Modifier.height(12.dp))
             }
@@ -97,7 +123,13 @@ fun StepsTab(recipe: Recipe, highlightStep: Int?, onToggle: (String) -> Unit) {
 }
 
 @Composable
-private fun StepCard(number: Int, step: Step, highlighted: Boolean, onToggle: (String) -> Unit) {
+private fun StepCard(
+    number: Int,
+    step: Step,
+    highlighted: Boolean,
+    onToggle: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val haptics = LocalHapticFeedback.current
     val animations = rememberAnimationsEnabled()
     val shape = RoundedCornerShape(12.dp)
@@ -113,7 +145,7 @@ private fun StepCard(number: Int, step: Step, highlighted: Boolean, onToggle: (S
         }
     }
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)

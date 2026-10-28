@@ -23,6 +23,19 @@
     <string name="ingredients_empty">No ingredients saved for this recipe.</string>
     <string name="steps_empty">No steps saved for this recipe.</string>
     <string name="steps_progress">%1$d of %2$d done</string>
+    <string name="time_prep">Prep</string>
+    <string name="time_cook">Cook</string>
+    <string name="time_total">Total</string>
+    <string name="temperatures_empty">No oven temperatures found in this recipe.</string>
+    <string name="temperature_step">Step %1$d</string>
+    <string name="shopping_add_all">Add all ingredients</string>
+    <string name="shopping_added">On the shopping list</string>
+    <string name="shopping_view_list">View list</string>
+
+    <plurals name="shopping_list_count">
+        <item quantity="one">%d item on the shopping list</item>
+        <item quantity="other">%d items on the shopping list</item>
+    </plurals>
 
     <plurals name="recipe_count">
         <item quantity="one">%d recipe</item>

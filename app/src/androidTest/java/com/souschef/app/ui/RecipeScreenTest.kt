@@ -1,8 +1,8 @@
 package com.souschef.app.ui
 
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
@@ -11,6 +11,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -19,11 +21,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.souschef.app.data.Recipe
+import com.souschef.app.data.Step
+import com.souschef.app.data.Temperature
 import com.souschef.app.sampleRecipe
 import com.souschef.app.ui.recipe.RecipeScreen
 import com.souschef.app.ui.recipe.RecipeTab
 import com.souschef.app.ui.theme.SousChefTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -108,46 +113,142 @@ class RecipeScreenTest {
         )
     }
 
+    @Test
+    fun times_show_prep_cook_total_and_dashes() {
+        val current = setRecipeScreen(sampleRecipe(), initialTab = RecipeTab.Times)
+        composeRule.onNodeWithText("PREP").assertIsDisplayed()
+        composeRule.onNodeWithText("15m").assertIsDisplayed()
+        composeRule.onNodeWithText("COOK").assertIsDisplayed()
+        composeRule.onNodeWithText("3h").assertIsDisplayed()
+        composeRule.onNodeWithText("TOTAL").assertIsDisplayed()
+        composeRule.onNodeWithText("3h 15m").assertIsDisplayed()
+
+        composeRule.runOnUiThread { current.value = sampleRecipe().copy(cookMinutes = null) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("—").assertIsDisplayed()
+
+        composeRule.runOnUiThread {
+            current.value = sampleRecipe().copy(prepMinutes = null, cookMinutes = null, totalMinutes = null)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("PREP").assertDoesNotExist()
+    }
+
+    @Test
+    fun temperature_card_jumps_to_step() {
+        var jumped: Int? = null
+        setRecipeScreen(
+            sampleRecipe(),
+            initialTab = RecipeTab.Times,
+            onJumpToStep = { jumped = it },
+        )
+        composeRule.onNodeWithText("Step 1").performClick()
+        assertEquals(0, jumped)
+        composeRule.onNodeWithText("STEPS").assertIsSelected()
+        composeRule.onNodeWithText("Heat the oven to 160°C.").assertIsDisplayed()
+        composeRule.onNodeWithText("01").assertIsDisplayed()
+    }
+
+    @Test
+    fun temperature_jump_scrolls_to_a_later_step() {
+        val steps = (1..12).map { Step("s-$it", "Step number $it does something.", checked = false) }
+        setRecipeScreen(
+            sampleRecipe().copy(
+                steps = steps,
+                temperatures = listOf(Temperature(150, 300, "150°C", "Set the oven to 150°C.", 9)),
+            ),
+            initialTab = RecipeTab.Times,
+        )
+        composeRule.onNodeWithText("Step 10").performClick()
+        composeRule.onNodeWithText("Step number 10 does something.").assertIsDisplayed()
+    }
+
+    @Test
+    fun no_temperatures_shows_empty_copy() {
+        setRecipeScreen(sampleRecipe().copy(temperatures = emptyList()), initialTab = RecipeTab.Times)
+        composeRule.onNodeWithText("No oven temperatures found in this recipe.").assertIsDisplayed()
+    }
+
+    @Test
+    fun shopping_tab_adds_all() {
+        var added: List<String>? = null
+        var opened = false
+        setRecipeScreen(
+            sampleRecipe(),
+            initialTab = RecipeTab.Shopping,
+            onAddToShopping = { added = it },
+            onOpenShopping = { opened = true },
+        )
+        composeRule.onNodeWithText("Add all ingredients").performClick()
+        assertEquals(listOf("2 tbsp olive oil", "1kg beef shin"), added)
+        composeRule.onNodeWithText("View list").performClick()
+        assertTrue(opened)
+    }
+
+    @Test
+    fun added_rows_are_disabled() {
+        var added: List<String>? = null
+        setRecipeScreen(
+            sampleRecipe(),
+            initialTab = RecipeTab.Shopping,
+            addedShoppingTexts = setOf("2 tbsp olive oil"),
+            onAddToShopping = { added = it },
+        )
+        composeRule.onNodeWithText("1kg beef shin").assertIsDisplayed()
+        composeRule.onNodeWithText("2 tbsp olive oil").assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("On the shopping list").assertIsDisplayed()
+        composeRule.onNodeWithText("2 tbsp olive oil").performClick()
+        assertNull(added)
+    }
+
     private fun setRecipeScreen(
         recipe: Recipe,
         onToggleIngredient: (String) -> Unit = {},
         onToggleStep: (String) -> Unit = {},
         onDelete: () -> Unit = {},
         initialTab: RecipeTab = RecipeTab.Ingredients,
-    ) {
+        onJumpToStep: (Int) -> Unit = {},
+        addedShoppingTexts: Set<String> = emptySet(),
+        onAddToShopping: (List<String>) -> Unit = {},
+        onOpenShopping: () -> Unit = {},
+    ): MutableState<Recipe> {
+        val current = mutableStateOf(recipe)
         composeRule.setContent {
             SousChefTheme {
-                var current by remember { mutableStateOf(recipe) }
                 var tab by rememberSaveable { mutableStateOf(initialTab.name) }
                 RecipeScreen(
-                    recipe = current,
+                    recipe = current.value,
                     activeTab = RecipeTab.valueOf(tab),
                     onTabSelected = { tab = it.name },
                     onBack = {},
                     onEdit = {},
                     onDelete = onDelete,
                     onToggleIngredient = { id ->
-                        current = current.copy(
-                            ingredients = current.ingredients.map {
+                        current.value = current.value.copy(
+                            ingredients = current.value.ingredients.map {
                                 if (it.id == id) it.copy(checked = !it.checked) else it
                             },
                         )
                         onToggleIngredient(id)
                     },
                     onToggleStep = { id ->
-                        current = current.copy(
-                            steps = current.steps.map {
+                        current.value = current.value.copy(
+                            steps = current.value.steps.map {
                                 if (it.id == id) it.copy(checked = !it.checked) else it
                             },
                         )
                         onToggleStep(id)
                     },
-                    onJumpToStep = {},
-                    addedShoppingTexts = emptySet<String>(),
-                    onAddToShopping = {},
-                    onOpenShopping = {},
+                    onJumpToStep = { index ->
+                        tab = RecipeTab.Steps.name
+                        onJumpToStep(index)
+                    },
+                    addedShoppingTexts = addedShoppingTexts,
+                    onAddToShopping = onAddToShopping,
+                    onOpenShopping = onOpenShopping,
                 )
             }
         }
+        return current
     }
 }

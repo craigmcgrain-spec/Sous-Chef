@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.souschef.app.data.Recipe
 import com.souschef.app.data.RecipeExtractor
 import com.souschef.app.data.RecipeStore
+import com.souschef.app.data.ShoppingItem
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -24,6 +25,13 @@ class RecipeViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null,
+        )
+
+    val shopping: StateFlow<List<ShoppingItem>> = store.shopping
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
         )
 
     fun toggleIngredient(id: String) = toggle { recipe ->

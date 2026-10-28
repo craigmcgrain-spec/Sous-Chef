@@ -5,6 +5,7 @@ package com.souschef.app.ui.recipe
 import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,8 +51,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +63,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -88,8 +94,13 @@ fun RecipeScreen(
     addedShoppingTexts: Set<String>,
     onAddToShopping: (List<String>) -> Unit,
     onOpenShopping: () -> Unit,
+    shoppingCount: Int = addedShoppingTexts.size,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
+    var highlightStep by rememberSaveable { mutableStateOf<Int?>(null) }
+    val listState = rememberLazyListState()
+    var listTop by remember { mutableFloatStateOf(0f) }
+    var stickyHeight by remember { mutableFloatStateOf(0f) }
     val animations = rememberAnimationsEnabled()
     val slide = with(LocalDensity.current) { 8.dp.roundToPx() }
 
@@ -107,10 +118,19 @@ fun RecipeScreen(
                 .fillMaxWidth(),
         ) {
             RecipeActions(onBack = onBack, onEdit = onEdit, onDelete = { confirmDelete = true })
-            LazyColumn(modifier = Modifier.weight(1f)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .onGloballyPositioned { listTop = it.boundsInRoot().top },
+            ) {
                 item(key = "header") { RecipeHeader(recipe) }
                 stickyHeader(key = "tabs") {
-                    Box(Modifier.background(MaterialTheme.colorScheme.background)) {
+                    Box(
+                        Modifier
+                            .background(MaterialTheme.colorScheme.background)
+                            .onGloballyPositioned { stickyHeight = it.size.height.toFloat() },
+                    ) {
                         Column {
                             RecipeTabs(activeTab, onTabSelected)
                             HairlineRule()
@@ -122,8 +142,14 @@ fun RecipeScreen(
                         targetState = activeTab,
                         transitionSpec = {
                             if (animations) {
-                                (fadeIn(tween(220)) + slideInVertically(tween(220)) { slide }) togetherWith
-                                    (fadeOut(tween(220)) + slideOutVertically(tween(220)) { -slide })
+                                ContentTransform(
+                                    targetContentEnter = fadeIn(tween(220)) +
+                                        slideInVertically(tween(220)) { slide },
+                                    initialContentExit = fadeOut(tween(220)) +
+                                        slideOutVertically(tween(220)) { -slide },
+                                    // Content size jumps so a step jump can use the full scroll range.
+                                    sizeTransform = null,
+                                )
                             } else {
                                 EnterTransition.None togetherWith ExitTransition.None
                             }
@@ -132,10 +158,24 @@ fun RecipeScreen(
                     ) { tab ->
                         when (tab) {
                             RecipeTab.Ingredients -> IngredientsTab(recipe, onToggleIngredient)
-                            RecipeTab.Steps -> StepsTab(recipe, highlightStep = null, onToggle = onToggleStep)
-                            // Task 10 fills Times & Shopping; onJumpToStep and the shopping
-                            // callbacks are already wired through the route.
-                            RecipeTab.Times, RecipeTab.Shopping -> Box(Modifier.height(1.dp))
+                            RecipeTab.Steps -> StepsTab(
+                                recipe,
+                                highlightStep = highlightStep,
+                                onToggle = onToggleStep,
+                                scrollState = listState,
+                                contentTop = listTop + stickyHeight,
+                            )
+                            RecipeTab.Times -> TimesTab(recipe) { index ->
+                                highlightStep = index
+                                onJumpToStep(index)
+                            }
+                            RecipeTab.Shopping -> ShoppingTab(
+                                recipe = recipe,
+                                addedTexts = addedShoppingTexts,
+                                onAdd = onAddToShopping,
+                                onOpenShopping = onOpenShopping,
+                                shoppingCount = shoppingCount,
+                            )
                         }
                     }
                 }

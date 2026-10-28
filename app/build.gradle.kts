@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.souschef.app"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.souschef.app"

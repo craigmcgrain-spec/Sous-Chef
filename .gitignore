@@ -1,2 +1,12 @@
 .worktrees/
 .superpowers/
+
+.gradle/
+build/
+app/build/
+.venv-build/
+local.properties
+.idea/
+*.iml
+*.egg-info/
+__pycache__/

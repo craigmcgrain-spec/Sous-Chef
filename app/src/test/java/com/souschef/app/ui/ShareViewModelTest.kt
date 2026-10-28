@@ -14,10 +14,12 @@ import com.souschef.app.data.Temperature
 import com.souschef.app.sampleRecipe
 import com.souschef.app.ui.ShareUiState.Done
 import com.souschef.app.ui.ShareUiState.Failure
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -35,10 +37,14 @@ private val sampleExtraction = ExtractedRecipe(
 private class FakeFetcher : HtmlFetcher {
     var html = ""
     var error: FetchException? = null
+    var failure: Throwable? = null
+    var gate: CompletableDeferred<Unit>? = null
     var calls = 0
 
     override suspend fun fetch(url: String): String {
         calls++
+        gate?.await()
+        failure?.let { throw it }
         error?.let { throw it }
         return html
     }
@@ -102,6 +108,19 @@ class ShareViewModelTest {
     }
 
     @Test
+    fun `superseded share cannot overwrite no link failure`() = runTest {
+        fetcher.gate = CompletableDeferred()
+        vm.onShareText(URL)
+        runCurrent()
+        vm.onShareText("words")
+        advanceUntilIdle()
+        assertEquals(Failure("", "That share didn't include a link.", false), vm.state.value)
+        vm.retry()
+        advanceUntilIdle()
+        assertEquals(1, fetcher.calls)
+    }
+
+    @Test
     fun `duplicate opens saved copy`() = runTest {
         store.seed(sampleRecipe("id-9", URL))
         vm.onShareText("$URL")
@@ -124,6 +143,14 @@ class ShareViewModelTest {
         vm.onShareText(URL)
         advanceUntilIdle()
         assertEquals("The site didn't respond. Try again in a moment.", (vm.state.value as Failure).message)
+    }
+
+    @Test
+    fun `unexpected failure uses fallback copy`() = runTest {
+        fetcher.failure = IllegalArgumentException("unexpected url")
+        vm.onShareText(URL)
+        advanceUntilIdle()
+        assertEquals(Failure(URL, "Something went wrong reading that page.", true), vm.state.value)
     }
 
     @Test

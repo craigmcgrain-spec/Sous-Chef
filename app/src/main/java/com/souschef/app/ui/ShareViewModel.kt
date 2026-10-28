@@ -11,6 +11,7 @@ import com.souschef.app.data.RecipeStore
 import com.souschef.app.data.domainOf
 import com.souschef.app.data.extractSharedUrl
 import com.souschef.app.data.toRecipe
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,8 @@ class ShareViewModel(
     private var job: Job? = null
 
     fun onShareText(text: String?) {
+        job?.cancel()
+        lastUrl = null
         val url = extractSharedUrl(text)
         if (url == null) {
             _state.value = ShareUiState.Failure("", NO_LINK, canRetry = false)
@@ -84,6 +87,10 @@ class ShareViewModel(
                 _state.value = ShareUiState.Failure(url, fetchMessage(e), canRetry = e.canRetry)
             } catch (e: ExtractionException) {
                 _state.value = ShareUiState.Failure(url, extractionMessage(e.code), canRetry = e.code != "NO_RECIPE")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = ShareUiState.Failure(url, READ_FAILED, canRetry = true)
             }
         }
     }

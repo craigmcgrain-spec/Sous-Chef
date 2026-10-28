@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 
 interface RecipeExtractor {
     suspend fun extract(html: String, url: String): ExtractedRecipe
@@ -39,6 +40,8 @@ class RecipeParser : RecipeExtractor {
             } catch (e: PyException) {
                 val code = ERROR_CODE.find(e.message.orEmpty())?.groupValues?.get(1) ?: "PARSE_FAILED"
                 throw ExtractionException(code, e)
+            } catch (e: SerializationException) {
+                throw ExtractionException("PARSE_FAILED", e)
             }
         }
     }

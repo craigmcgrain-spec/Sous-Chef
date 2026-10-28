@@ -91,7 +91,8 @@ overflow does the same job without leaving the app.
 Everything happens on the phone. The page is fetched directly from the site,
 parsed on the device with Chaquopy, and stored locally in DataStore. There is no
 account, no server, no analytics, no telemetry, no crash reporting, and no
-third-party API. The URL and page contents never leave the device.
+third-party API. The only network requests are to the recipe page you shared and
+the images it references; nothing is sent to us or to any third party.
 
 ## How it fits together
 

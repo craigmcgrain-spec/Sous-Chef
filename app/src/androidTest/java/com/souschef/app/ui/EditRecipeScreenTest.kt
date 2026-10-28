@@ -1,10 +1,12 @@
 package com.souschef.app.ui
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,7 +36,7 @@ import java.util.UUID
 class EditRecipeScreenTest {
 
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun blank_title_blocks_save() {
@@ -162,6 +164,36 @@ class EditRecipeScreenTest {
     }
 
     @Test
+    fun system_back_cannot_discard_while_saving() {
+        var cancelled = false
+        var backReached = false
+        setEditScreen(
+            sampleRecipe(),
+            saving = true,
+            onCancel = { cancelled = true },
+            onBackReached = { backReached = true },
+        )
+
+        field(0).performTextInput("!")
+        pressBack()
+
+        composeRule.onNodeWithText("Discard changes?").assertDoesNotExist()
+        assertFalse(cancelled)
+        // The screen, not the NavHost/activity, must swallow the press.
+        assertFalse(backReached)
+    }
+
+    @Test
+    fun system_back_asks_to_discard_when_not_saving() {
+        setEditScreen(sampleRecipe())
+
+        field(0).performTextInput("!")
+        pressBack()
+
+        composeRule.onNodeWithText("Discard changes?").assertIsDisplayed()
+    }
+
+    @Test
     fun back_with_changes_asks_to_discard() {
         var cancelled = false
         setEditScreen(sampleRecipe(), onCancel = { cancelled = true })
@@ -187,14 +219,24 @@ class EditRecipeScreenTest {
 
     private fun field(index: Int) = composeRule.onAllNodes(hasSetTextAction())[index]
 
+    /** Drives the activity-level back path that navigation-compose also consumes. */
+    private fun pressBack() {
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.waitForIdle()
+    }
+
     private fun setEditScreen(
         recipe: Recipe,
         saving: Boolean = false,
         onCancel: () -> Unit = {},
         onSave: (Recipe) -> Unit = {},
+        onBackReached: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
             SousChefTheme {
+                // Registered before the screen, so it only runs when the screen's
+                // own BackHandler is disabled and lets the press fall through.
+                if (onBackReached != null) BackHandler { onBackReached() }
                 EditRecipeScreen(
                     recipe = recipe,
                     saving = saving,

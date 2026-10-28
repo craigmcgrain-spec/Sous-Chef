@@ -54,6 +54,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private const val EDIT_ROUTE = "recipe/{id}/edit"
+
 @Composable
 private fun SousChefNavHost(container: AppContainer) {
     val navController = rememberNavController()
@@ -117,7 +119,7 @@ private fun SousChefNavHost(container: AppContainer) {
                     )
                 }
             }
-            composable("recipe/{id}/edit") { entry ->
+            composable(EDIT_ROUTE) { entry ->
                 val recipeId = entry.arguments?.getString("id").orEmpty()
                 val recipeViewModel: RecipeViewModel = viewModel(
                     factory = viewModelFactory {
@@ -139,7 +141,11 @@ private fun SousChefNavHost(container: AppContainer) {
                                 if (stale != null) {
                                     snackbarMessage = context.getString(R.string.temperatures_stale)
                                 }
-                                navController.popBackStack()
+                                // Only close the route we saved from; a save that
+                                // outlives the screen must not pop the recipe.
+                                if (navController.currentDestination?.route == EDIT_ROUTE) {
+                                    navController.popBackStack()
+                                }
                             }
                         },
                     )

@@ -124,7 +124,9 @@ fun EditRecipeScreen(
         steps = moveItem(steps, from, to)
     }
 
-    BackHandler(enabled = !saving) { cancel() }
+    // Always enabled: while saving the press must be swallowed, not fall through
+    // to the NavHost's back handler, which would pop the route under the callback.
+    BackHandler { if (!saving) cancel() }
 
     Box(
         modifier = Modifier
@@ -257,7 +259,12 @@ private fun EditActions(saving: Boolean, onBack: () -> Unit, onSave: () -> Unit)
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(R.string.back),
-                tint = MaterialTheme.colorScheme.onBackground,
+                // A disabled IconButton does not tint its icon, so dim it here.
+                tint = if (saving) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.onBackground
+                },
             )
         }
         Text(

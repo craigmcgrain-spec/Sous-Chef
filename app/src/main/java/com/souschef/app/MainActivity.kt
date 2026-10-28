@@ -1,9 +1,11 @@
 package com.souschef.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +33,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.souschef.app.ui.LibraryScreen
 import com.souschef.app.ui.LibraryViewModel
+import com.souschef.app.ui.PasteLinkDialog
+import com.souschef.app.ui.ShareDialog
+import com.souschef.app.ui.ShareUiState
+import com.souschef.app.ui.ShareViewModel
 import com.souschef.app.ui.ShoppingScreen
 import com.souschef.app.ui.ShoppingViewModel
 import com.souschef.app.ui.edit.EditRecipeScreen
@@ -40,14 +46,37 @@ import com.souschef.app.ui.recipe.RecipeViewModel
 import com.souschef.app.ui.theme.SousChefTheme
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var container: AppContainer
+
+    private val shareViewModel: ShareViewModel by viewModels {
+        viewModelFactory {
+            initializer { ShareViewModel(container.fetcher, container.extractor, container.store) }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val container = (application as SousChefApp).container
+        container = (application as SousChefApp).container
+        // A rotation re-delivers the launch intent; only a fresh screen consumes it.
+        if (savedInstanceState == null) handleShareIntent(intent)
         setContent {
             SousChefTheme {
-                SousChefNavHost(container)
+                SousChefNavHost(container, shareViewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    private fun handleShareIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
+            shareViewModel.onShareText(intent.getStringExtra(Intent.EXTRA_TEXT))
         }
     }
 }
@@ -55,16 +84,23 @@ class MainActivity : ComponentActivity() {
 private const val EDIT_ROUTE = "recipe/{id}/edit"
 
 @Composable
-private fun SousChefNavHost(container: AppContainer) {
+private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewModel) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
+    var pasteLinkOpen by rememberSaveable { mutableStateOf(false) }
+    val shareState by shareViewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(snackbarMessage) {
         snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
             snackbarMessage = null
         }
+    }
+    LaunchedEffect(shareState) {
+        val done = shareState as? ShareUiState.Done ?: return@LaunchedEffect
+        navController.navigate("recipe/${done.recipeId}") { launchSingleTop = true }
+        shareViewModel.consumeDone()
     }
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = "library") {
@@ -81,8 +117,7 @@ private fun SousChefNavHost(container: AppContainer) {
                     uncheckedShoppingCount = uncheckedCount,
                     onOpenRecipe = { id -> navController.navigate("recipe/$id") },
                     onOpenShopping = { navController.navigate("shopping") },
-                    // Task 13 wires the paste dialog; until then the action is inert.
-                    onPasteLink = {},
+                    onPasteLink = { pasteLinkOpen = true },
                 )
             }
             composable("recipe/{id}") { entry ->
@@ -164,6 +199,21 @@ private fun SousChefNavHost(container: AppContainer) {
                     onClearAll = shoppingViewModel::clearAll,
                 )
             }
+        }
+        ShareDialog(
+            state = shareState,
+            onRetry = shareViewModel::retry,
+            onDismiss = shareViewModel::dismissFailure,
+            onPasteLink = { pasteLinkOpen = true },
+        )
+        if (pasteLinkOpen) {
+            PasteLinkDialog(
+                onDismiss = { pasteLinkOpen = false },
+                onOpen = { url ->
+                    pasteLinkOpen = false
+                    shareViewModel.onShareText(url)
+                },
+            )
         }
         SnackbarHost(
             hostState = snackbarHostState,

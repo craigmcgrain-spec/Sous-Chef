@@ -61,6 +61,8 @@ class ShareViewModel(
     }
 
     fun dismissFailure() {
+        // Cancel also aborts an in-flight read so a late result can't navigate.
+        job?.cancel()
         _state.value = ShareUiState.Idle
     }
 

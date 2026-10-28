@@ -2,6 +2,13 @@
 <resources>
     <string name="app_name">Sous Chef</string>
     <string name="paste_link">Paste a link</string>
+    <string name="share_reading">Reading %1$s…</string>
+    <string name="share_failure_title">Couldn\'t read that recipe</string>
+    <string name="retry">Retry</string>
+    <string name="paste_different_link">Paste a different link</string>
+    <string name="field_link">Link</string>
+    <string name="paste_link_invalid">Enter a link starting with http:// or https://.</string>
+    <string name="open">Open</string>
     <string name="shopping_list">Shopping list</string>
     <string name="more_options">More options</string>
     <string name="library_empty_title">Nothing cooking yet</string>

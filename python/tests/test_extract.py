@@ -73,6 +73,25 @@ def test_gas_mark_uses_specified_fahrenheit():
     assert temps[0]["valueF"] == 350
 
 
+def test_temperature_context_is_the_containing_sentence():
+    step = (
+        "Brown the beef over a high heat until deeply caramelised, about ten minutes. "
+        "Heat the oven to 200°C and roast for twenty minutes. "
+        "Rest the meat, then serve with mash."
+    )
+    temps = json.loads(temperatures_from_texts([step]))
+    assert temps[0]["context"] == "Heat the oven to 200°C and roast for twenty minutes."
+
+
+def test_each_temperature_keeps_its_own_sentence():
+    step = "Set the oven to 180°C. Then raise it to 220°C for the crust."
+    temps = json.loads(temperatures_from_texts([step]))
+    assert [t["context"] for t in temps] == [
+        "Set the oven to 180°C.",
+        "Then raise it to 220°C for the crust.",
+    ]
+
+
 def test_ingredient_temperatures_have_null_step_index():
     data = json.loads(extract(fixture("ingredient_temperatures.html"), "https://example.com/x"))
     ingredient_temps = [t for t in data["temperatures"] if t["stepIndex"] is None]

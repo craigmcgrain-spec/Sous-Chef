@@ -32,6 +32,7 @@ _GAS_MARK = {
 }
 _NUMBERING_RE = re.compile(r"^\s*(?:step\s*\d+|\d+)\s*[.):](?=\s|$)\s*", re.IGNORECASE)
 _DURATION_RE = re.compile(r"^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$", re.IGNORECASE)
+_SENTENCE_END_RE = re.compile(r"[.!?](?=\s|$)")
 
 
 class ExtractionError(Exception):
@@ -265,14 +266,25 @@ def _temperatures(texts, ingredient_texts=()):
 def _scan_temperatures(temperatures, seen, text, step_index):
     for match in _TEMPERATURE_RE.finditer(text):
         amount = int(match.group(1))
+        context = _sentence_at(text, match.start())
         if (match.group(2) or match.group(3) or "C").upper() == "C":
-            _add_temperature(temperatures, seen, amount, round(amount * 9 / 5 + 32), match.group(0), text, step_index)
+            _add_temperature(temperatures, seen, amount, round(amount * 9 / 5 + 32), match.group(0), context, step_index)
         else:
-            _add_temperature(temperatures, seen, round((amount - 32) * 5 / 9), amount, match.group(0), text, step_index)
+            _add_temperature(temperatures, seen, round((amount - 32) * 5 / 9), amount, match.group(0), context, step_index)
     for match in _GAS_MARK_RE.finditer(text):
         values = _GAS_MARK.get(int(match.group(1)))
         if values is not None:
-            _add_temperature(temperatures, seen, values[0], values[1], match.group(0), text, step_index)
+            _add_temperature(temperatures, seen, values[0], values[1], match.group(0), _sentence_at(text, match.start()), step_index)
+
+
+def _sentence_at(text, position):
+    """The sentence containing [position], punctuation kept; full text if unsplit."""
+    start = 0
+    for match in _SENTENCE_END_RE.finditer(text):
+        if position <= match.start():
+            return text[start:match.end()].strip()
+        start = match.end()
+    return text[start:].strip()
 
 
 def _add_temperature(temperatures, seen, value_c, value_f, raw, context, step_index):

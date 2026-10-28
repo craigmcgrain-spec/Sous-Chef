@@ -26,6 +26,7 @@ import org.junit.Test
 /** Whole-list rewrites, like [com.souschef.app.data.DataStoreRecipeStore]. */
 private class FakeStore(initial: Recipe) : RecipeStore {
     private val state = MutableStateFlow(listOf(initial))
+    var updateError: Throwable? = null
 
     override val recipes: Flow<List<Recipe>> = state
     override val shopping: Flow<List<ShoppingItem>> = MutableStateFlow(emptyList())
@@ -35,6 +36,7 @@ private class FakeStore(initial: Recipe) : RecipeStore {
     }
 
     override suspend fun update(recipe: Recipe) {
+        updateError?.let { throw it }
         state.value = state.value.map { if (it.id == recipe.id) recipe else it }
     }
 
@@ -136,5 +138,19 @@ class RecipeViewModelTest {
         assertTrue(saved.steps.single().checked)
         assertTrue(saved.temperatures.isEmpty())
         assertEquals("Saved, but temperatures couldn't be refreshed.", message)
+    }
+
+    @Test
+    fun `saveEdited reports a failed write so the editor can recover`() = runTest {
+        val store = FakeStore(sampleRecipe())
+        store.updateError = IllegalStateException("disk full")
+        val vm = RecipeViewModel("id-1", store, FakeExtractor())
+        var message: String? = "not called"
+
+        vm.saveEdited(sampleRecipe().copy(title = "Changed")) { message = it }
+        advanceUntilIdle()
+
+        assertEquals(RecipeViewModel.SAVE_FAILED, message)
+        assertEquals("Sunday Ragù", store.recipes.first().single().title)
     }
 }

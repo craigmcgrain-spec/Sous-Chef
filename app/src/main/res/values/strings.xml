@@ -26,7 +26,6 @@
     <string name="tab_steps">Steps</string>
     <string name="tab_times">Times</string>
     <string name="tab_shopping">Shopping</string>
-    <string name="servings_line">Serves %1$s</string>
     <string name="ingredients_empty">No ingredients saved for this recipe.</string>
     <string name="steps_empty">No steps saved for this recipe.</string>
     <string name="steps_progress">%1$d of %2$d done</string>
@@ -64,6 +63,7 @@
     <string name="keep_editing">Keep editing</string>
     <!-- Also returned by RecipeViewModel.saveEdited, which has no Context for resources. -->
     <string name="temperatures_stale">Saved, but temperatures couldn\'t be refreshed.</string>
+    <string name="save_failed">Couldn\'t save your changes. Try again.</string>
 
     <plurals name="shopping_list_count">
         <item quantity="one">%d item on the shopping list</item>

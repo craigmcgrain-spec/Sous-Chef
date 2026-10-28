@@ -76,7 +76,8 @@ class MainActivity : ComponentActivity() {
 
     private fun handleShareIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
-            shareViewModel.onShareText(intent.getStringExtra(Intent.EXTRA_TEXT))
+            // Some share sheets send a CharSequence (styled text), not a String.
+            shareViewModel.onShareText(intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString())
         }
     }
 }
@@ -168,16 +169,21 @@ private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewMo
                         onCancel = { navController.popBackStack() },
                         onSave = { edited ->
                             saving = true
-                            recipeViewModel.saveEdited(edited) { stale ->
+                            recipeViewModel.saveEdited(edited) { result ->
                                 saving = false
-                                // The text saved either way; only temperatures were left stale.
-                                if (stale != null) {
-                                    snackbarMessage = context.getString(R.string.temperatures_stale)
-                                }
-                                // Only close the route we saved from; a save that
-                                // outlives the screen must not pop the recipe.
-                                if (navController.currentDestination?.route == EDIT_ROUTE) {
-                                    navController.popBackStack()
+                                if (result == RecipeViewModel.SAVE_FAILED) {
+                                    // Nothing was written; stay on the form so the edits survive.
+                                    snackbarMessage = context.getString(R.string.save_failed)
+                                } else {
+                                    // The text saved either way; only temperatures were left stale.
+                                    if (result != null) {
+                                        snackbarMessage = context.getString(R.string.temperatures_stale)
+                                    }
+                                    // Only close the route we saved from; a save that
+                                    // outlives the screen must not pop the recipe.
+                                    if (navController.currentDestination?.route == EDIT_ROUTE) {
+                                        navController.popBackStack()
+                                    }
                                 }
                             }
                         },
@@ -204,7 +210,11 @@ private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewMo
             state = shareState,
             onRetry = shareViewModel::retry,
             onDismiss = shareViewModel::dismissFailure,
-            onPasteLink = { pasteLinkOpen = true },
+            onPasteLink = {
+                // The failure dialog sits above the paste dialog; close it first.
+                shareViewModel.dismissFailure()
+                pasteLinkOpen = true
+            },
         )
         if (pasteLinkOpen) {
             PasteLinkDialog(

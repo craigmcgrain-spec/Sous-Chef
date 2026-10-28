@@ -8,6 +8,7 @@ import okhttp3.Request
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.InterruptedIOException
 import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.TimeUnit
@@ -69,6 +70,9 @@ class RecipeFetcher(private val client: OkHttpClient = defaultClient()) : HtmlFe
         } catch (e: FetchException) {
             throw e
         } catch (e: SocketTimeoutException) {
+            throw FetchException(FetchError.TIMEOUT, cause = e)
+        } catch (e: InterruptedIOException) {
+            // OkHttp's whole-call timeout; SocketTimeoutException is caught above first.
             throw FetchException(FetchError.TIMEOUT, cause = e)
         } catch (e: IOException) {
             throw FetchException(FetchError.OFFLINE, cause = e)

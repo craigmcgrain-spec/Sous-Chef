@@ -74,12 +74,12 @@ class ShareViewModel(
         lastUrl = url
         job?.cancel()
         job = viewModelScope.launch {
-            store.findByUrl(url)?.let {
-                _state.value = ShareUiState.Done(it.id)
-                return@launch
-            }
-            _state.value = ShareUiState.Loading(domainOf(url))
             try {
+                store.findByUrl(url)?.let {
+                    _state.value = ShareUiState.Done(it.id)
+                    return@launch
+                }
+                _state.value = ShareUiState.Loading(domainOf(url))
                 val html = fetcher.fetch(url)
                 val extracted = extractor.extract(html, url)
                 val recipe = extracted.toRecipe(UUID.randomUUID().toString(), url, System.currentTimeMillis())

@@ -9,6 +9,7 @@ import com.souschef.app.data.ShoppingItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,6 +21,7 @@ class RecipeViewModel(
 ) : ViewModel() {
 
     val recipe: StateFlow<Recipe?> = store.recipes
+        .catch { emit(emptyList()) }
         .map { recipes -> recipes.firstOrNull { it.id == recipeId } }
         .stateIn(
             scope = viewModelScope,
@@ -28,6 +30,7 @@ class RecipeViewModel(
         )
 
     val shopping: StateFlow<List<ShoppingItem>> = store.shopping
+        .catch { emit(emptyList()) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -76,7 +79,15 @@ class RecipeViewModel(
             } catch (e: Exception) {
                 null
             }
-            store.update(edited.copy(temperatures = temperatures.orEmpty()))
+            try {
+                store.update(edited.copy(temperatures = temperatures.orEmpty()))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Let the editor re-enable Save instead of trapping the screen on a failed write.
+                onResult(SAVE_FAILED)
+                return@launch
+            }
             onResult(if (temperatures == null) TEMPERATURES_STALE else null)
         }
     }
@@ -84,6 +95,7 @@ class RecipeViewModel(
     companion object {
         // Copy also lives in strings.xml; the view model has no Context for it.
         const val TEMPERATURES_STALE = "Saved, but temperatures couldn't be refreshed."
+        const val SAVE_FAILED = "Couldn't save your changes. Try again."
     }
 
     private fun toggle(transform: (Recipe) -> Recipe) {

@@ -84,7 +84,11 @@ fun ShareDialog(
                         }
                     }
                     TextButton(onClick = onPasteLink) {
-                        Text(stringResource(R.string.paste_different_link))
+                        Text(
+                            stringResource(
+                                if (state.url.isEmpty()) R.string.paste_link else R.string.paste_different_link,
+                            ),
+                        )
                     }
                 }
             },
@@ -105,7 +109,7 @@ fun PasteLinkDialog(onDismiss: () -> Unit, onOpen: (String) -> Unit) {
     var invalid by rememberSaveable { mutableStateOf(false) }
     val open = {
         // Share parsing already knows how to pull one http(s) link out of text.
-        val link = extractSharedUrl(text)?.takeIf { it == text.trim() }
+        val link = extractSharedUrl(text)
         if (link != null) {
             onOpen(link)
         } else {

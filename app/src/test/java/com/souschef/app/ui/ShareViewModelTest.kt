@@ -64,6 +64,7 @@ private class FakeExtractor : RecipeExtractor {
 
 private class FakeStore : RecipeStore {
     val saved = mutableListOf<Recipe>()
+    var findError: Throwable? = null
     private val seeded = MutableStateFlow<List<Recipe>>(emptyList())
 
     fun seed(recipe: Recipe) {
@@ -78,7 +79,10 @@ private class FakeStore : RecipeStore {
         seeded.value = seeded.value + recipe
     }
 
-    override suspend fun findByUrl(url: String): Recipe? = seeded.value.firstOrNull { it.url == url }
+    override suspend fun findByUrl(url: String): Recipe? {
+        findError?.let { throw it }
+        return seeded.value.firstOrNull { it.url == url }
+    }
 
     override suspend fun update(recipe: Recipe) = error("not used")
     override suspend fun update(id: String, transform: (Recipe) -> Recipe) = error("not used")
@@ -161,6 +165,15 @@ class ShareViewModelTest {
         vm.onShareText(URL)
         advanceUntilIdle()
         assertEquals("No recipe found on that page.", (vm.state.value as Failure).message)
+    }
+
+    @Test
+    fun `store read failure shows a retryable failure`() = runTest {
+        store.findError = IllegalStateException("corrupt store")
+        vm.onShareText(URL)
+        advanceUntilIdle()
+        assertEquals(Failure(URL, "Something went wrong reading that page.", true), vm.state.value)
+        assertEquals(0, fetcher.calls)
     }
 
     @Test

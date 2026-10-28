@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.souschef.app.R
 import com.souschef.app.data.Recipe
+import com.souschef.app.data.formatServings
 import com.souschef.app.ui.components.CheckRow
 import com.souschef.app.ui.components.SectionLabel
 
@@ -21,8 +22,8 @@ fun IngredientsTab(recipe: Recipe, onToggle: (String) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        recipe.servings?.let { servings ->
-            SectionLabel(stringResource(R.string.servings_line, servings))
+        formatServings(recipe.servings)?.let { servings ->
+            SectionLabel(servings)
             Spacer(Modifier.height(12.dp))
         }
         if (recipe.ingredients.isEmpty()) {

@@ -58,6 +58,7 @@ class ShareDialogsTest {
         composeRule.onNodeWithText("Couldn't read that recipe").assertIsDisplayed()
         composeRule.onNodeWithText("That page isn't available (error 404).").assertIsDisplayed()
         composeRule.onNodeWithText("https://example.com/recipe").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste a different link").assertIsDisplayed()
         composeRule.onNodeWithText("Retry").performClick()
         assertEquals(1, retries)
     }
@@ -79,8 +80,21 @@ class ShareDialogsTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Paste a different link").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Paste a link").assertIsDisplayed().performClick()
         assertEquals(1, pastes)
+    }
+
+    @Test
+    fun paste_dialog_strips_trailing_punctuation() {
+        var opened: String? = null
+        composeRule.setContent {
+            SousChefTheme {
+                PasteLinkDialog(onDismiss = {}, onOpen = { opened = it })
+            }
+        }
+        composeRule.onNode(hasSetTextAction()).performTextInput("https://x.com/a.")
+        composeRule.onNodeWithText("Open").performClick()
+        assertEquals("https://x.com/a", opened)
     }
 
     @Test

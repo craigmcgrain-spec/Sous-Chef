@@ -94,6 +94,10 @@ account, no server, no analytics, no telemetry, no crash reporting, and no
 third-party API. The only network requests are to the recipe page you shared and
 the images it references; nothing is sent to us or to any third party.
 
+Recipes are local-only: Android backup is disabled (`android:allowBackup="false"`),
+so the library and shopping list are not copied to Google Drive or restored onto
+another device.
+
 ## How it fits together
 
 ```
@@ -125,6 +129,10 @@ Share intent ─► MainActivity ─► ShareViewModel ─► RecipeFetcher (OkH
 - **Bot walls are not bypassed.** Sites that block non-browser or automated
   clients return their 403 and the app shows "That page isn't available (error
   403)." Try a different link.
+- **`http://` pages are fetched unencrypted.** Cleartext traffic is enabled so a
+  share of a plain-http recipe page still works. The app sends no credentials or
+  cookies, but the page contents travel over the network without TLS; prefer
+  `https://` links when the site offers one.
 - **The shopping list is a snapshot.** Items are copied when added; later recipe
   edits do not rewrite them. "Add all" only adds lines that are not already
   there for that recipe.

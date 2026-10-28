@@ -31,6 +31,7 @@ import com.souschef.app.data.Recipe
 import com.souschef.app.data.Temperature
 import com.souschef.app.data.formatDuration
 import com.souschef.app.data.formatTemperature
+import com.souschef.app.data.totalDurationMinutes
 import com.souschef.app.ui.components.SectionLabel
 
 @Composable
@@ -42,7 +43,7 @@ fun TimesTab(recipe: Recipe, onJumpToStep: (Int) -> Unit) {
     ) {
         val prep = formatDuration(recipe.prepMinutes)
         val cook = formatDuration(recipe.cookMinutes)
-        val total = formatDuration(recipe.totalMinutes)
+        val total = formatDuration(recipe.totalDurationMinutes())
         if (prep != null || cook != null || total != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

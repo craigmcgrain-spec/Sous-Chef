@@ -31,6 +31,26 @@
     <string name="shopping_add_all">Add all ingredients</string>
     <string name="shopping_added">On the shopping list</string>
     <string name="shopping_view_list">View list</string>
+    <string name="save">Save</string>
+    <string name="field_title">Title</string>
+    <string name="field_servings">Servings</string>
+    <string name="field_ingredient">Ingredient</string>
+    <string name="field_step">Step</string>
+    <string name="title_required">Give this recipe a title.</string>
+    <string name="add_ingredient">+ Add ingredient</string>
+    <string name="add_step">+ Add step</string>
+    <string name="reorder_ingredient">Reorder ingredient %1$s</string>
+    <string name="reorder_step">Reorder step %1$s</string>
+    <string name="remove_ingredient">Remove ingredient %1$s</string>
+    <string name="remove_step">Remove step %1$s</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="discard_changes_title">Discard changes?</string>
+    <string name="discard_changes_body">Your edits to this recipe won’t be saved.</string>
+    <string name="discard">Discard</string>
+    <string name="keep_editing">Keep editing</string>
+    <!-- Also returned by RecipeViewModel.saveEdited, which has no Context for resources. -->
+    <string name="temperatures_stale">Saved, but temperatures couldn\'t be refreshed.</string>
 
     <plurals name="shopping_list_count">
         <item quantity="one">%d item on the shopping list</item>

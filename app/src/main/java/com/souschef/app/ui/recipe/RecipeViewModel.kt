@@ -6,6 +6,7 @@ import com.souschef.app.data.Recipe
 import com.souschef.app.data.RecipeExtractor
 import com.souschef.app.data.RecipeStore
 import com.souschef.app.data.ShoppingItem
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -15,8 +16,7 @@ import kotlinx.coroutines.launch
 class RecipeViewModel(
     private val recipeId: String,
     private val store: RecipeStore,
-    // Task 11 recomputes temperatures through this on save.
-    @Suppress("unused") private val extractor: RecipeExtractor,
+    private val extractor: RecipeExtractor,
 ) : ViewModel() {
 
     val recipe: StateFlow<Recipe?> = store.recipes
@@ -60,6 +60,30 @@ class RecipeViewModel(
             store.delete(recipeId)
             onDeleted()
         }
+    }
+
+    /**
+     * Refreshes temperatures from the edited text, then saves. [onResult] gets
+     * null on success or the message to show when only the text could be saved.
+     */
+    fun saveEdited(edited: Recipe, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val temperatures = try {
+                extractor.temperatures(edited.steps.map { it.text }) +
+                    extractor.temperatures(edited.ingredients.map { it.text }).map { it.copy(stepIndex = null) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            store.update(edited.copy(temperatures = temperatures.orEmpty()))
+            onResult(if (temperatures == null) TEMPERATURES_STALE else null)
+        }
+    }
+
+    companion object {
+        // Copy also lives in strings.xml; the view model has no Context for it.
+        const val TEMPERATURES_STALE = "Saved, but temperatures couldn't be refreshed."
     }
 
     private fun toggle(transform: (Recipe) -> Recipe) {

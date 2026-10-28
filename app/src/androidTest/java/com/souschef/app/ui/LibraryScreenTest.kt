@@ -1,10 +1,15 @@
 package com.souschef.app.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.souschef.app.sampleRecipe
 import com.souschef.app.ui.theme.SousChefTheme
@@ -67,5 +72,25 @@ class LibraryScreenTest {
         composeRule.onNodeWithText("3").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Shopping list").performClick()
         assertTrue(opened)
+    }
+
+    @Test
+    fun wide_window_shows_two_columns() {
+        val second = sampleRecipe("id-2").copy(
+            title = "Roast Tomato Soup",
+            siteName = "Ottolenghi",
+            totalMinutes = 55,
+        )
+        composeRule.setContent {
+            SousChefTheme {
+                Box(Modifier.requiredWidth(600.dp).fillMaxHeight()) {
+                    LibraryScreen(listOf(sampleRecipe(), second), 0, {}, {}, {})
+                }
+            }
+        }
+        val firstBounds = composeRule.onNodeWithText("Sunday Ragù").fetchSemanticsNode().boundsInRoot
+        val secondBounds = composeRule.onNodeWithText("Roast Tomato Soup").fetchSemanticsNode().boundsInRoot
+        assertEquals(firstBounds.top, secondBounds.top, 1f)
+        assertTrue(secondBounds.left > firstBounds.left)
     }
 }

@@ -1,0 +1,2 @@
+pytest
+recipe-scrapers==15.13.0

@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sous Chef</string>
-    <string name="probe_loading">Loading Python…</string>
-    <string name="probe_failed">probe failed: %1$s</string>
 </resources>

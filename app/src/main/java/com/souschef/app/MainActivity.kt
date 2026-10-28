@@ -11,8 +11,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -23,6 +27,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.souschef.app.ui.LibraryScreen
 import com.souschef.app.ui.LibraryViewModel
+import com.souschef.app.ui.recipe.RecipeScreen
+import com.souschef.app.ui.recipe.RecipeTab
+import com.souschef.app.ui.recipe.RecipeViewModel
 import com.souschef.app.ui.theme.SousChefTheme
 
 class MainActivity : ComponentActivity() {
@@ -59,8 +66,36 @@ private fun SousChefNavHost(container: AppContainer) {
                 onPasteLink = {},
             )
         }
-        composable("recipe/{id}") { Placeholder("Recipe") }
-        composable("shopping") { Placeholder("Shopping") }
+        composable("recipe/{id}") { entry ->
+            val recipeId = entry.arguments?.getString("id").orEmpty()
+            val recipeViewModel: RecipeViewModel = viewModel(
+                factory = viewModelFactory {
+                    initializer { RecipeViewModel(recipeId, container.store, container.extractor) }
+                },
+            )
+            val recipe by recipeViewModel.recipe.collectAsStateWithLifecycle()
+            var activeTab by rememberSaveable { mutableStateOf(RecipeTab.Ingredients.name) }
+            recipe?.let { current ->
+                RecipeScreen(
+                    recipe = current,
+                    activeTab = RecipeTab.valueOf(activeTab),
+                    onTabSelected = { activeTab = it.name },
+                    onBack = { navController.popBackStack() },
+                    onEdit = { navController.navigate("recipe/$recipeId/edit") },
+                    onDelete = { recipeViewModel.delete { navController.popBackStack() } },
+                    onToggleIngredient = recipeViewModel::toggleIngredient,
+                    onToggleStep = recipeViewModel::toggleStep,
+                    // Task 10 switches to Steps and scrolls the chosen card.
+                    onJumpToStep = {},
+                    addedShoppingTexts = emptySet(),
+                    onAddToShopping = recipeViewModel::addToShopping,
+                    onOpenShopping = { navController.navigate("shopping") },
+                )
+            }
+        }
+        // Task 11 replaces this edit placeholder with the real form.
+        composable("recipe/{id}/edit") { Placeholder(stringResource(R.string.edit_recipe)) }
+        composable("shopping") { Placeholder(stringResource(R.string.shopping_list)) }
     }
 }
 

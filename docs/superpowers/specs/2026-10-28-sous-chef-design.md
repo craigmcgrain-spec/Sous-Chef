@@ -9,15 +9,19 @@ Repo: https://github.com/craigmcgrain-spec/Sous-Chef (currently empty)
 Sous Chef turns a recipe web page into a clean, cookable card on an Android phone.
 
 The user finds a recipe in their browser, shares the page to Sous Chef, and gets a
-saved recipe with three tabs: Ingredients, Step-by-step, and Times & Temperatures.
-Ingredients and steps can be ticked off while cooking. Saved recipes open offline.
+saved recipe with four tabs: Ingredients, Step-by-step, Times & Temperatures, and
+Shopping. Ingredients and steps can be ticked off while cooking. Recipes can be
+corrected after import, and ingredients can be sent to one shopping list shared
+across recipes. Saved recipes open offline.
 
 **Who it is for:** one home cook, on their own phone, standing in a kitchen.
 
 **Success looks like:**
 - Sharing a URL from Chrome saves the recipe and opens it, cold start to readable recipe under 10 seconds on the test emulator.
 - Ticking steps or ingredients survives closing and reopening the app.
-- All three tabs are usable one-handed, with wet or messy hands.
+- All four tabs are usable one-handed, with wet or messy hands.
+- An edited title or step persists, and temperatures refresh from the edited text.
+- Ingredients added from a recipe appear once on the shared shopping list and can be ticked off while shopping.
 - A page Sous Chef cannot parse fails with a plain-English reason and a retry, never a blank screen or a stack trace.
 - A saved recipe renders fully with no network connection.
 
@@ -30,17 +34,22 @@ listed, warm editorial visual direction, Material 3 foundations.
 - Share target for browser URLs (`ACTION_SEND`, `text/plain`).
 - On-device HTML fetch and Python parsing (Chaquopy).
 - Local recipe library, no account.
-- Recipe screen with the three tabs.
+- Recipe screen with four tabs: Ingredients, Steps, Times, Shopping.
 - Ingredient and step check-off, persisted.
 - Times and oven temperatures extracted from the page.
+- Recipe editing: title, servings, prep/cook/total, ingredients and steps, with
+  add, remove and reorder. Temperatures are recomputed from the edited text.
+- One shared shopping list, fed from recipe Shopping tabs and opened from the
+  Library.
 - Delete a recipe with confirmation.
 - Paste-a-link fallback entry point.
 - Light and dark themes, phone-first with a sensible tablet reflow.
 
 ### Out of scope
-Timers, serving scaling, unit conversion, shopping lists, accounts or sync,
-search, recipe editing, photo/OCR import, LLM fallback, iOS, CI pipelines,
-Play Store publishing, analytics, crash reporting, localization beyond English.
+Timers, serving scaling, unit conversion, accounts or sync, search, photo/OCR
+import, LLM fallback, iOS, CI pipelines, Play Store publishing, analytics, crash
+reporting, localization beyond English, shopping-list sharing or export,
+per-item quantity aggregation across recipes.
 
 Saying no to these is deliberate. Each is a separate request.
 
@@ -67,9 +76,12 @@ MainActivity ──► ShareViewModel
                     ▼
               ExtractedRecipe (kotlinx.serialization)
                     ▼
-              RecipeRepository (DataStore, JSON list)
+              RecipeRepository (DataStore: recipes + shopping JSON)
                     ▼
-              Library screen / Recipe screen (Navigation Compose)
+              Library · Recipe · Edit · Shopping screens
+                    │
+                    └─ Edit save ── Chaquopy ──► souschef/extract.py
+                                          temperatures_from_texts()
 ```
 
 **Why Kotlin fetches and Python only parses.** One boundary: HTML in, normalized
@@ -77,12 +89,12 @@ JSON out. OkHttp owns redirects, cookies and UA. Python needs no network stack,
 and `extract.py` is testable with fixture HTML on a normal machine.
 
 **Dependency injection:** none. A small `AppContainer` created in the
-`Application` exposes repository, fetcher and parser. Constructor injection
+`Application` exposes the repository, fetcher and parser. Constructor injection
 everywhere else.
 
 **Threading:** fetch and parse on `Dispatchers.IO`. Chaquopy calls are serialized
 through a `Mutex`; the Python interpreter is initialized lazily on the first
-parse and the UI shows progress meanwhile.
+parse or edit, and the UI shows progress meanwhile.
 
 **HTML fetch rules:** Chrome-mobile User-Agent, follow redirects, 15 s connect
 and read timeouts, abort above 8 MB, accept only `text/html` and
@@ -98,6 +110,14 @@ def extract(html: str, url: str) -> str: ...
 
 Returns a JSON string. Raises `ExtractionError` with a short machine code
 (`NO_RECIPE`, `EMPTY_PAGE`, `PARSE_FAILED`) when nothing cookable is found.
+
+```python
+def temperatures_from_texts(items: list[str]) -> str: ...
+```
+
+Returns the temperature array for edited ingredients and steps, reusing the
+same regex and normalization as `extract`. Editing never re-fetches the page and
+never duplicates temperature logic in Kotlin.
 
 ```json
 {
@@ -170,35 +190,57 @@ data class Recipe(
     val savedAtEpochMs: Long,
 )
 
-@Serializable data class Ingredient(val id: Int, val text: String, val checked: Boolean)
-@Serializable data class Step(val id: Int, val text: String, val checked: Boolean)
+@Serializable data class Ingredient(val id: String, val text: String, val checked: Boolean)
+@Serializable data class Step(val id: String, val text: String, val checked: Boolean)
 @Serializable data class Temperature(
     val valueC: Int?, val valueF: Int?, val raw: String,
     val context: String, val stepIndex: Int?,
 )
+
+@Serializable data class ShoppingItem(
+    val id: String,                 // UUID
+    val text: String,
+    val checked: Boolean,
+    val recipeId: String,
+    val recipeTitle: String,        // snapshot, survives recipe deletion
+    val addedAtEpochMs: Long,
+)
 ```
 
-**Store:** AndroidX DataStore Preferences, single key `recipes`, holding the
-whole list as JSON via kotlinx.serialization. One repository class, all writes
-serialized by a `Mutex`, exposed as `Flow<List<Recipe>>`.
+**Store:** AndroidX DataStore Preferences with two keys, `recipes` and
+`shopping`, each holding JSON via kotlinx.serialization. One repository class,
+all writes serialized by a `Mutex`, exposing `Flow<List<Recipe>>` and
+`Flow<List<ShoppingItem>>`.
 
-Room is intentionally skipped: the data is a small list with no queries, joins
+Room is intentionally skipped: the data is small lists with no queries, joins
 or migrations. Full-list rewrite on each check is a few kilobytes.
 `shortcut: whole-list rewrite; move to Room if the library exceeds ~500 recipes
 or needs search.`
 
-**Dedup:** normalized URL (fragment removed, scheme/host lowercased). Re-sharing
-a saved URL opens the saved copy without refetching.
+**Dedup:** recipes by normalized URL (fragment removed, scheme/host lowercased).
+Re-sharing a saved URL opens the saved copy without refetching. Shopping items
+by `(recipeId, text)`, so tapping "Add all" twice never doubles a row.
 
-**ID stability:** item ids are list indices assigned at save time. Check state is
-stored per item, not per index, so display order can change later without losing
-ticks.
+**Deletion:** deleting a recipe removes it from the library, not from the
+shopping list. Bought or planned groceries survive, grouped under the stored
+recipe title.
+
+**Editing:** ingredient and step ids are UUIDs assigned when the line is created,
+so reordering or deleting neighbours never moves a tick to another line. Edited
+lines keep their id and checked state; new lines start unchecked.
+
+**Shopping is a snapshot:** items are copied when added. Later recipe edits do
+not rewrite the shopping list; "Add all" adds only lines not already present for
+that recipe.
 
 ## 6. Screens and flows
 
+Routes: `library`, `recipe/{id}`, `recipe/{id}/edit`, `shopping`.
+
 ### Library
 - Top bar: "Sous Chef" wordmark in Fraunces, 28sp; muted count line ("6 recipes").
-  Overflow menu: "Paste a link".
+  Trailing shopping-cart icon with an unchecked-count badge opens the shopping
+  list. Overflow menu: "Paste a link".
 - Rows 88dp tall: 64dp rounded thumbnail (Coil) or a paper-toned block with the
   title initial in serif; serif title 20sp; metadata "BBC Good Food · 3h";
   hairline divider.
@@ -208,13 +250,14 @@ ticks.
 - Long-press does nothing. Deleting lives on the recipe screen.
 
 ### Recipe
-- Back arrow and overflow (Delete recipe → confirm dialog).
+- Back arrow and overflow (Edit recipe, Delete recipe → confirm dialog).
 - 16:9 image when present, rounded bottom corners; title in 32sp Fraunces below
   the image on paper; metadata row "BBC Good Food · 3h · Serves 4", each part
   omitted when unknown.
-- Sticky tab row: INGREDIENTS / STEPS / TIMES, 11sp letter-spaced caps,
-  terracotta underline for the selected tab, content crossfade + 8dp slide.
-  Selected tab survives rotation and process death via `rememberSaveable`.
+- Sticky tab row: INGREDIENTS / STEPS / TIMES / SHOPPING, 11sp letter-spaced
+  caps, terracotta underline for the selected tab, content crossfade + 8dp
+  slide. Scrollable horizontally if the labels do not fit. Selected tab
+  survives rotation and process death via `rememberSaveable`.
 - **Ingredients tab:** servings line in small caps; rows 56dp minimum with a
   28dp checkbox; ticking strikes and dims the line.
 - **Steps tab:** progress rule "3 of 8 done"; step cards with terracotta serif
@@ -225,7 +268,32 @@ ticks.
   show `180°C` with `/ 350°F` secondary, the source sentence beneath, and a
   "Step 4" chip that switches to Steps and scrolls to that step. Empty copy:
   "No oven temperatures found in this recipe."
+- **Shopping tab:** "Add all ingredients" text button at the top, then the
+  ingredient rows. Tapping a row adds it; rows already on the shared list dim
+  and show a check instead. A bottom line reads "6 items on the shopping list"
+  with a "View list" action.
 - Recipe content max width 720dp, centered on wide screens.
+
+### Edit recipe
+- Reached from the recipe overflow. One scrollable form: title (required),
+  servings, prep/cook/total minutes (numeric, optional), ingredients, steps.
+- Each list has drag-handle reorder (plus TalkBack "Move up" / "Move down"
+  actions), a trailing remove icon, and a quiet "+ Add ingredient" / "+ Add
+  step" row. Empty lines are dropped on save.
+- Top-bar Save; back or up with unsaved changes asks "Discard changes?".
+- Title is required; a blank title blocks saving with "Give this recipe a title."
+- Saving keeps ids and checked state for retained lines, assigns UUIDs to new
+  ones, computes total from prep + cook when total is blank, then recomputes
+  temperatures through `temperatures_from_texts`. No network is touched.
+- Author, image, source URL and saved date are not edited.
+
+### Shopping list
+- Opened from the Library cart icon; accessible even with no recipes.
+- Grouped by recipe title in small caps, rows 56dp with the same checkbox as
+  ingredients; checked rows strike and dim. Library badge counts unchecked items.
+- Overflow: "Clear checked" (immediate) and "Clear all" (confirm dialog).
+- Empty state: serif "Nothing to buy", one sentence: "Add ingredients from a
+  recipe's Shopping tab."
 
 ### Share flow
 - `MainActivity` is exported with an `ACTION_SEND` / `text/plain` filter.
@@ -297,6 +365,7 @@ icons. Vector only, no bitmaps.
 | `NO_RECIPE` | "No recipe found on that page." |
 | Python `PARSE_FAILED` | "Something went wrong reading that page." |
 | Duplicate | Opens the saved recipe silently |
+| Temperature recompute fails on save | Recipe text still saves; temperatures clear and a snackbar says "Saved, but temperatures couldn't be refreshed." |
 
 All failures offer Retry where a retry can help, keep the URL visible, and log
 the technical detail to Logcat. No raw exceptions in UI. The previous screen and
@@ -324,22 +393,30 @@ saved library are never disturbed by a failed share.
 unknown site with JSON-LD, a page with no recipe, `HowToSection` steps, and
 temperature variants (`180°C`, `350 F`, `gas mark 4`, `180g` negative, `fan
 160`). Assert the normalized JSON, not scraper internals.
+`temperatures_from_texts` runs against the same variants, including reordered
+and edited lines.
 
 **Kotlin unit (JUnit):**
 - Decode Python JSON fixtures into `ExtractedRecipe`; missing/extra fields.
 - Share text → URL extraction, including trailing punctuation and multiple URLs.
 - Duration formatting (`195` → "3h 15m", `45` → "45m").
 - Temperature display pairing and fallback.
-- Repository dedup by normalized URL.
+- Repository dedup by normalized URL, and shopping dedup by `(recipeId, text)`.
+- Edit save: blank title rejected, empty lines dropped, total computed from
+  prep + cook, reorder keeps ids and checked state.
+- Shopping badge counts unchecked items; "Clear checked" removes only those.
 
 **Instrumented (Compose UI test, emulator `Test_Android`):**
 - Empty library state renders and "Paste a link" opens the dialog.
-- A seeded recipe shows all three tabs and switches between them.
+- A seeded recipe shows all four tabs and switches between them.
 - Ticking a step then recreating the activity keeps the step checked.
+- Adding an ingredient from the Shopping tab shows it on the shopping list, and
+  adding again does not duplicate it.
+- Editing the title updates the recipe and the library row.
 
 **Manual gate before calling it done:**
 - `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <url>` on the emulator with a real recipe URL.
-- Screenshots of all three tabs in light and dark, plus the empty and error states.
+- Screenshots of all four tabs in light and dark, plus the empty, edit, shopping and error states.
 - Airplane mode after saving: recipe still opens with all tabs.
 
 ## 11. Build and tooling
@@ -391,6 +468,9 @@ Chaquopy + Python 3.13 + `lxml` before any product UI exists.
 7. **APK size (~40–60 MB).** Accepted for on-device Python; 32-bit ABIs omitted.
 8. **Data loss on corrupt store.** Repository treats unparseable JSON as an empty
    library and keeps the raw string under `recipes_backup` before overwriting.
+9. **Shopping list drifts from edited recipes.** Items are snapshots by design;
+   "Add all" re-adds only missing lines. Acceptable for a grocery list that must
+   stay stable while you shop.
 
 ## 13. Decisions recorded
 
@@ -402,6 +482,9 @@ Chaquopy + Python 3.13 + `lxml` before any product UI exists.
 | Storage | DataStore JSON list | No queries, no migrations, least code |
 | Fetching | Kotlin/OkHttp | One clean boundary, testable parser |
 | Design | Warm editorial cookbook | User chose it; readable with wet hands |
+| Shopping list | Recipe Shopping tab feeds one shared list | User chose it; groceries span recipes |
+| Recipe editing | Essential fields + reorder | Fixes extraction errors without becoming a recipe editor |
+| Edited temperatures | Recomputed in Python from edited text | One regex implementation, no drift between import and edit |
 | Dynamic color | Off | Preserves the cookbook palette |
 | DI | Manual `AppContainer` | One-screen-scale app; Hilt is overhead |
 | Icons | Core Material icons | Avoid extended-icons APK cost |

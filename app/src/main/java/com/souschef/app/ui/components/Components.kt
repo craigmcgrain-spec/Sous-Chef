@@ -69,7 +69,7 @@ fun CheckRow(
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) colors.onSurface else colors.onSurfaceVariant,
+            color = if (enabled && !checked) colors.onSurface else colors.onSurfaceVariant,
             textDecoration = if (checked) TextDecoration.LineThrough else null,
             modifier = Modifier.weight(1f),
         )
@@ -77,11 +77,12 @@ fun CheckRow(
 }
 
 @Composable
-fun SectionLabel(text: String) {
+fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
     )
 }
 
@@ -97,8 +98,8 @@ fun HairlineRule() {
 fun EmptyState(
     title: String,
     body: String,
-    actionLabel: String,
-    onAction: () -> Unit,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -120,9 +121,11 @@ fun EmptyState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(16.dp))
-        TextButton(onClick = onAction) {
-            Text(actionLabel, style = MaterialTheme.typography.titleMedium)
+        if (actionLabel != null) {
+            Spacer(Modifier.height(16.dp))
+            TextButton(onClick = onAction) {
+                Text(actionLabel, style = MaterialTheme.typography.titleMedium)
+            }
         }
     }
 }

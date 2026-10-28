@@ -7,13 +7,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -35,6 +31,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.souschef.app.ui.LibraryScreen
 import com.souschef.app.ui.LibraryViewModel
+import com.souschef.app.ui.ShoppingScreen
+import com.souschef.app.ui.ShoppingViewModel
 import com.souschef.app.ui.edit.EditRecipeScreen
 import com.souschef.app.ui.recipe.RecipeScreen
 import com.souschef.app.ui.recipe.RecipeTab
@@ -151,7 +149,21 @@ private fun SousChefNavHost(container: AppContainer) {
                     )
                 }
             }
-            composable("shopping") { Placeholder(stringResource(R.string.shopping_list)) }
+            composable("shopping") {
+                val shoppingViewModel: ShoppingViewModel = viewModel(
+                    factory = viewModelFactory {
+                        initializer { ShoppingViewModel(container.store) }
+                    },
+                )
+                val items by shoppingViewModel.items.collectAsStateWithLifecycle()
+                ShoppingScreen(
+                    items = items,
+                    onBack = { navController.popBackStack() },
+                    onToggle = shoppingViewModel::toggle,
+                    onClearChecked = shoppingViewModel::clearChecked,
+                    onClearAll = shoppingViewModel::clearAll,
+                )
+            }
         }
         SnackbarHost(
             hostState = snackbarHostState,
@@ -159,17 +171,5 @@ private fun SousChefNavHost(container: AppContainer) {
                 .align(Alignment.BottomCenter)
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         )
-    }
-}
-
-@Composable
-private fun Placeholder(label: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, style = MaterialTheme.typography.headlineMedium)
     }
 }

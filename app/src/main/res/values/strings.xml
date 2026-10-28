@@ -31,6 +31,12 @@
     <string name="shopping_add_all">Add all ingredients</string>
     <string name="shopping_added">On the shopping list</string>
     <string name="shopping_view_list">View list</string>
+    <string name="shopping_empty_title">Nothing to buy</string>
+    <string name="shopping_empty_body">Add ingredients from a recipe\'s Shopping tab.</string>
+    <string name="clear_checked">Clear checked</string>
+    <string name="clear_all">Clear all</string>
+    <string name="clear_all_title">Clear the shopping list?</string>
+    <string name="clear_all_body">Every item will be removed. This can\'t be undone.</string>
     <string name="save">Save</string>
     <string name="field_title">Title</string>
     <string name="field_servings">Servings</string>

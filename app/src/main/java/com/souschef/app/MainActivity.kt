@@ -21,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,7 +39,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            var probe by remember { mutableStateOf("Loading Python…") }
+            val context = LocalContext.current
+            var probe by remember { mutableStateOf(context.getString(R.string.probe_loading)) }
 
             LaunchedEffect(Unit) {
                 probe = withContext(Dispatchers.IO) {
@@ -46,7 +49,7 @@ class MainActivity : ComponentActivity() {
                             .getModule("souschef.extract")
                             .callAttr("probe")
                             .toString()
-                    }.getOrElse { "probe failed: $it" }
+                    }.getOrElse { context.getString(R.string.probe_failed, it.toString()) }
                 }
             }
 
@@ -59,7 +62,7 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Sous Chef", color = Ink, fontSize = 32.sp)
+                Text(stringResource(R.string.app_name), color = Ink, fontSize = 32.sp)
                 Spacer(Modifier.height(12.dp))
                 Text(probe, color = InkMuted, textAlign = TextAlign.Center)
             }

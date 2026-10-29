@@ -58,6 +58,12 @@ class RecipeViewModel(
         viewModelScope.launch { store.addToShopping(current, texts) }
     }
 
+    fun setCategory(category: String?) {
+        viewModelScope.launch {
+            store.update(recipeId) { it.copy(category = category) }
+        }
+    }
+
     fun delete(onDeleted: () -> Unit) {
         viewModelScope.launch {
             store.delete(recipeId)
@@ -68,16 +74,25 @@ class RecipeViewModel(
     /**
      * Refreshes temperatures from the edited text, then saves. [onResult] gets
      * null on success or the message to show when only the text could be saved.
+     * When the editor changed temperatures by hand, pass false to keep them.
      */
-    fun saveEdited(edited: Recipe, onResult: (String?) -> Unit) {
+    fun saveEdited(
+        edited: Recipe,
+        refreshTemperatures: Boolean = true,
+        onResult: (String?) -> Unit,
+    ) {
         viewModelScope.launch {
-            val temperatures = try {
-                extractor.temperatures(edited.steps.map { it.text }) +
-                    extractor.temperatures(edited.ingredients.map { it.text }).map { it.copy(stepIndex = null) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                null
+            val temperatures = if (refreshTemperatures) {
+                try {
+                    extractor.temperatures(edited.steps.map { it.text }) +
+                        extractor.temperatures(edited.ingredients.map { it.text }).map { it.copy(stepIndex = null) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                edited.temperatures
             }
             try {
                 store.update(edited.copy(temperatures = temperatures.orEmpty()))
@@ -88,7 +103,7 @@ class RecipeViewModel(
                 onResult(SAVE_FAILED)
                 return@launch
             }
-            onResult(if (temperatures == null) TEMPERATURES_STALE else null)
+            onResult(if (refreshTemperatures && temperatures == null) TEMPERATURES_STALE else null)
         }
     }
 

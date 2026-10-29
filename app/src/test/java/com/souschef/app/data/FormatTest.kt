@@ -17,7 +17,7 @@ class FormatTest {
 
     @Test
     fun `temperature formatting pairs units`() {
-        assertEquals("180°C / 350°F", formatTemperature(Temperature(180, 350, "180°C", "ctx", 0)))
+        assertEquals("350°F / 180°C", formatTemperature(Temperature(180, 350, "180°C", "ctx", 0)))
         assertEquals("350°F", formatTemperature(Temperature(null, 350, "350 F", "ctx", 0)))
     }
 

@@ -122,6 +122,23 @@ class RecipeViewModelTest {
     }
 
     @Test
+    fun `saveEdited keeps hand-edited temperatures without extracting`() = runTest {
+        val store = FakeStore(sampleRecipe())
+        val extractor = FakeExtractor()
+        val vm = RecipeViewModel("id-1", store, extractor)
+        val manual = Temperature(204, 400, "400°F", "Roast the chicken", null)
+        val edited = sampleRecipe().copy(temperatures = listOf(manual))
+        var message: String? = "not called"
+
+        vm.saveEdited(edited, refreshTemperatures = false) { message = it }
+        advanceUntilIdle()
+
+        assertEquals(listOf(manual), store.recipes.first().single().temperatures)
+        assertTrue(extractor.calls.isEmpty())
+        assertNull(message)
+    }
+
+    @Test
     fun `saveEdited keeps text and clears temperatures when extraction fails`() = runTest {
         val store = FakeStore(sampleRecipe())
         val vm = RecipeViewModel("id-1", store, FakeExtractor(fail = true))

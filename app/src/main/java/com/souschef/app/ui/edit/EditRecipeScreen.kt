@@ -63,15 +63,24 @@ import com.souschef.app.R
 import com.souschef.app.data.Ingredient
 import com.souschef.app.data.Recipe
 import com.souschef.app.data.Step
+import com.souschef.app.data.Temperature
 import com.souschef.app.ui.components.HairlineRule
 import com.souschef.app.ui.components.SectionLabel
 import java.util.UUID
+import kotlin.math.roundToInt
 
 private data class LineDraft(val id: String, val text: String, val checked: Boolean)
+
+private data class TemperatureDraft(val f: String, val context: String, val stepIndex: Int?)
 
 private val LineSaver = listSaver<List<LineDraft>, String>(
     save = { lines -> lines.flatMap { listOf(it.id, it.checked.toString(), it.text) } },
     restore = { saved -> saved.chunked(3).map { LineDraft(it[0], it[2], it[1].toBooleanStrict()) } },
+)
+
+private val TemperatureSaver = listSaver<List<TemperatureDraft>, String>(
+    save = { drafts -> drafts.flatMap { listOf(it.f, it.context, it.stepIndex?.toString().orEmpty()) } },
+    restore = { saved -> saved.chunked(3).map { TemperatureDraft(it[0], it[1], it[2].toIntOrNull()) } },
 )
 
 @Composable
@@ -79,7 +88,7 @@ fun EditRecipeScreen(
     recipe: Recipe,
     saving: Boolean,
     onCancel: () -> Unit,
-    onSave: (Recipe) -> Unit,
+    onSave: (Recipe, Boolean) -> Unit,
 ) {
     var title by rememberSaveable(recipe.id) { mutableStateOf(recipe.title) }
     var servings by rememberSaveable(recipe.id) { mutableStateOf(recipe.servings.orEmpty()) }
@@ -92,8 +101,15 @@ fun EditRecipeScreen(
     var steps by rememberSaveable(recipe.id, stateSaver = LineSaver) {
         mutableStateOf(recipe.steps.map { LineDraft(it.id, it.text, it.checked) })
     }
+    var temperatureDrafts by rememberSaveable(recipe.id, stateSaver = TemperatureSaver) {
+        mutableStateOf(recipe.temperatures.map { it.toDraft() })
+    }
     var showTitleError by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
+
+    /** Untouched temperatures are refreshed from the text on save; edited ones are kept as-is. */
+    fun temperaturesEdited(): Boolean =
+        temperatureDrafts != recipe.temperatures.map { it.toDraft() }
 
     fun draft(): Recipe = recipe.copy(
         title = title.trim(),
@@ -103,6 +119,11 @@ fun EditRecipeScreen(
         totalMinutes = total.toIntOrNull() ?: sumMinutes(prep.toIntOrNull(), cook.toIntOrNull()),
         ingredients = ingredients.mapNotNull { it.toIngredient() },
         steps = steps.mapNotNull { it.toStep() },
+        temperatures = if (temperaturesEdited()) {
+            temperatureDrafts.mapNotNull { it.toTemperature() }
+        } else {
+            recipe.temperatures
+        },
     )
 
     fun cancel() {
@@ -114,7 +135,7 @@ fun EditRecipeScreen(
             showTitleError = true
             return
         }
-        onSave(draft())
+        onSave(draft(), !temperaturesEdited())
     }
 
     val ingredientReorder = rememberReorderState { from, to ->
@@ -215,6 +236,53 @@ fun EditRecipeScreen(
                 }
                 TextButton(onClick = { steps = steps + LineDraft(newId(), "", false) }) {
                     Text(stringResource(R.string.add_step))
+                }
+                SectionLabel(stringResource(R.string.section_temperatures))
+                temperatureDrafts.forEachIndexed { index, draft ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NumberField(
+                            value = draft.f,
+                            onValueChange = { f ->
+                                temperatureDrafts = temperatureDrafts.replaceAt(index, draft.copy(f = f))
+                            },
+                            label = stringResource(R.string.field_temperature),
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedTextField(
+                            value = draft.context,
+                            onValueChange = { context ->
+                                temperatureDrafts = temperatureDrafts.replaceAt(index, draft.copy(context = context))
+                            },
+                            placeholder = { Text(stringResource(R.string.field_temperature_context)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1.4f),
+                        )
+                        IconButton(
+                            onClick = {
+                                temperatureDrafts = temperatureDrafts.filterIndexed { i, _ -> i != index }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = stringResource(
+                                    R.string.remove_temperature,
+                                    draft.context.ifBlank { draft.f },
+                                ),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        temperatureDrafts = temperatureDrafts + TemperatureDraft("", "", null)
+                    },
+                ) {
+                    Text(stringResource(R.string.add_temperature))
                 }
             }
         }
@@ -400,7 +468,24 @@ private fun LineDraft.toStep(): Step? {
     return if (text.isEmpty()) null else Step(id = id, text = text, checked = checked)
 }
 
-private fun List<LineDraft>.replaceAt(index: Int, line: LineDraft): List<LineDraft> =
+private fun Temperature.toDraft(): TemperatureDraft = TemperatureDraft(
+    f = (valueF ?: valueC?.let { (it * 9 / 5.0 + 32).roundToInt() })?.toString().orEmpty(),
+    context = context,
+    stepIndex = stepIndex,
+)
+
+private fun TemperatureDraft.toTemperature(): Temperature? {
+    val fahrenheit = f.toIntOrNull() ?: return null
+    return Temperature(
+        valueC = ((fahrenheit - 32) * 5 / 9.0).roundToInt(),
+        valueF = fahrenheit,
+        raw = "$fahrenheit°F",
+        context = context.trim(),
+        stepIndex = stepIndex,
+    )
+}
+
+private fun <T> List<T>.replaceAt(index: Int, line: T): List<T> =
     mapIndexed { i, existing -> if (i == index) line else existing }
 
 private fun sumMinutes(prep: Int?, cook: Int?): Int? =

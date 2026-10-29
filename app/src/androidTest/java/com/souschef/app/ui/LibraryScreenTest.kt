@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.souschef.app.sampleRecipe
@@ -72,6 +73,37 @@ class LibraryScreenTest {
         composeRule.onNodeWithText("3").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Shopping list").performClick()
         assertTrue(opened)
+    }
+
+    @Test
+    fun category_chips_filter_the_list() {
+        val mains = sampleRecipe().copy(category = "Mains")
+        val snacks = sampleRecipe("id-2").copy(title = "Crisps", category = "Snacks")
+        composeRule.setContent {
+            SousChefTheme {
+                LibraryScreen(listOf(mains, snacks), 0, {}, {}, {})
+            }
+        }
+
+        composeRule.onNodeWithText("Sunday Ragù").assertIsDisplayed()
+        composeRule.onNodeWithText("Snacks").performScrollTo().performClick()
+        composeRule.onNodeWithText("Crisps").assertIsDisplayed()
+        composeRule.onNodeWithText("Sunday Ragù").assertDoesNotExist()
+        composeRule.onNodeWithText("All").performScrollTo().performClick()
+        composeRule.onNodeWithText("Sunday Ragù").assertIsDisplayed()
+    }
+
+    @Test
+    fun custom_category_appears_as_a_filter() {
+        val recipe = sampleRecipe().copy(category = "Weeknight")
+        composeRule.setContent {
+            SousChefTheme {
+                LibraryScreen(listOf(recipe), 0, {}, {}, {}, customCategories = listOf("Weeknight"))
+            }
+        }
+
+        composeRule.onNodeWithText("Weeknight").performScrollTo().performClick()
+        composeRule.onNodeWithText("Sunday Ragù").assertIsDisplayed()
     }
 
     @Test

@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -47,9 +49,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -67,16 +71,23 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import com.souschef.app.R
 import com.souschef.app.data.Recipe
+import com.souschef.app.data.RecipeCategory
 import com.souschef.app.data.formatRecipeMeta
+import com.souschef.app.ui.categoryName
 import com.souschef.app.ui.components.HairlineRule
+import com.souschef.app.ui.label
 
 enum class RecipeTab { Ingredients, Steps, Times, Shopping }
 
@@ -95,6 +106,11 @@ fun RecipeScreen(
     onAddToShopping: (List<String>) -> Unit,
     onOpenShopping: () -> Unit,
     shoppingCount: Int,
+    keepScreenAwake: Boolean = true,
+    onKeepScreenAwakeChange: (Boolean) -> Unit = {},
+    customCategories: List<String> = emptyList(),
+    onCategoryChange: (String?) -> Unit = {},
+    onAddCategory: (String) -> Unit = {},
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     var highlightStep by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -103,6 +119,11 @@ fun RecipeScreen(
     var stickyHeight by remember { mutableFloatStateOf(0f) }
     val animations = rememberAnimationsEnabled()
     val slide = with(LocalDensity.current) { 8.dp.roundToPx() }
+    val view = LocalView.current
+    DisposableEffect(view, keepScreenAwake) {
+        view.keepScreenOn = keepScreenAwake
+        onDispose { view.keepScreenOn = false }
+    }
 
     Box(
         modifier = Modifier
@@ -117,14 +138,27 @@ fun RecipeScreen(
                 .widthIn(max = 720.dp)
                 .fillMaxWidth(),
         ) {
-            RecipeActions(onBack = onBack, onEdit = onEdit, onDelete = { confirmDelete = true })
+            RecipeActions(
+                onBack = onBack,
+                onEdit = onEdit,
+                onDelete = { confirmDelete = true },
+                keepScreenAwake = keepScreenAwake,
+                onKeepScreenAwakeChange = onKeepScreenAwakeChange,
+            )
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .onGloballyPositioned { listTop = it.boundsInRoot().top },
             ) {
-                item(key = "header") { RecipeHeader(recipe) }
+                item(key = "header") {
+                    RecipeHeader(
+                        recipe = recipe,
+                        customCategories = customCategories,
+                        onCategoryChange = onCategoryChange,
+                        onAddCategory = onAddCategory,
+                    )
+                }
                 stickyHeader(key = "tabs") {
                     Box(
                         Modifier
@@ -196,7 +230,13 @@ fun RecipeScreen(
 }
 
 @Composable
-private fun RecipeActions(onBack: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun RecipeActions(
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    keepScreenAwake: Boolean,
+    onKeepScreenAwakeChange: (Boolean) -> Unit,
+) {
     var menuOpen by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
@@ -223,6 +263,18 @@ private fun RecipeActions(onBack: () -> Unit, onEdit: () -> Unit, onDelete: () -
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
+                    text = { Text(stringResource(R.string.keep_screen_awake)) },
+                    onClick = {
+                        menuOpen = false
+                        onKeepScreenAwakeChange(!keepScreenAwake)
+                    },
+                    trailingIcon = {
+                        if (keepScreenAwake) {
+                            Icon(imageVector = Icons.Default.Check, contentDescription = null)
+                        }
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text(stringResource(R.string.edit_recipe)) },
                     onClick = {
                         menuOpen = false
@@ -242,7 +294,13 @@ private fun RecipeActions(onBack: () -> Unit, onEdit: () -> Unit, onDelete: () -
 }
 
 @Composable
-private fun RecipeHeader(recipe: Recipe) {
+private fun RecipeHeader(
+    recipe: Recipe,
+    customCategories: List<String>,
+    onCategoryChange: (String?) -> Unit,
+    onAddCategory: (String) -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
     Column {
         RecipeImage(recipe)
         Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
@@ -260,7 +318,143 @@ private fun RecipeHeader(recipe: Recipe) {
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            if (recipe.url.isNotBlank()) {
+                Text(
+                    text = recipe.url,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .clickable { uriHandler.openUri(recipe.url) },
+                )
+            }
+            CategoryPicker(
+                selected = recipe.category,
+                customCategories = customCategories,
+                onSelect = onCategoryChange,
+                onAddCategory = onAddCategory,
+            )
         }
+    }
+}
+
+@Composable
+private fun CategoryPicker(
+    selected: String?,
+    customCategories: List<String>,
+    onSelect: (String?) -> Unit,
+    onAddCategory: (String) -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    var dialogOpen by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    val selectedLabel = categoryName(selected)?.let { stringResource(it.label) }
+        ?: selected?.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.category_none)
+    val customs = customCategories.filterNot { custom ->
+        RecipeCategory.entries.any { it.name.equals(custom, ignoreCase = true) }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.field_category),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box {
+            TextButton(onClick = { menuOpen = true }) {
+                Text(selectedLabel)
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.category_none)) },
+                    onClick = {
+                        onSelect(null)
+                        menuOpen = false
+                    },
+                )
+                RecipeCategory.entries.forEach { category ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(category.label)) },
+                        onClick = {
+                            onSelect(category.name)
+                            menuOpen = false
+                        },
+                    )
+                }
+                customs.forEach { name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            onSelect(name)
+                            menuOpen = false
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.category_new)) },
+                    onClick = {
+                        menuOpen = false
+                        newName = ""
+                        dialogOpen = true
+                    },
+                )
+            }
+        }
+    }
+
+    if (dialogOpen) {
+        AlertDialog(
+            onDismissRequest = { dialogOpen = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text(stringResource(R.string.new_category_title)) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text(stringResource(R.string.new_category_field)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val name = newName.trim()
+                        if (name.isNotEmpty()) {
+                            val fixed = RecipeCategory.entries.firstOrNull {
+                                it.name.equals(name, ignoreCase = true)
+                            }
+                            val existing = customs.firstOrNull {
+                                it.equals(name, ignoreCase = true)
+                            }
+                            when {
+                                fixed != null -> onSelect(fixed.name)
+                                existing != null -> onSelect(existing)
+                                else -> {
+                                    onAddCategory(name)
+                                    onSelect(name)
+                                }
+                            }
+                        }
+                        dialogOpen = false
+                    },
+                    enabled = newName.isNotBlank(),
+                ) {
+                    Text(stringResource(R.string.add))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { dialogOpen = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }
 

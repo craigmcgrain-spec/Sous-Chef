@@ -18,6 +18,10 @@ _MISSING_FIELDS = (
 )
 
 _TEMPERATURE_RE = re.compile(r"(?<!\d)(\d{1,4})\s*(?:°\s*([CF])?|([CF]))(?![A-Za-z])", re.IGNORECASE)
+_SPELLED_TEMPERATURE_RE = re.compile(
+    r"(?<!\d)(\d{1,4})\s*degrees?\s*(?:(F|C)\b|(fahrenheit|celsius))?",
+    re.IGNORECASE,
+)
 _GAS_MARK_RE = re.compile(r"gas\s*mark\s*(\d+)", re.IGNORECASE)
 _GAS_MARK = {
     1: (140, 275),
@@ -265,16 +269,29 @@ def _temperatures(texts, ingredient_texts=()):
 
 def _scan_temperatures(temperatures, seen, text, step_index):
     for match in _TEMPERATURE_RE.finditer(text):
-        amount = int(match.group(1))
-        context = _sentence_at(text, match.start())
-        if (match.group(2) or match.group(3) or "C").upper() == "C":
-            _add_temperature(temperatures, seen, amount, round(amount * 9 / 5 + 32), match.group(0), context, step_index)
-        else:
-            _add_temperature(temperatures, seen, round((amount - 32) * 5 / 9), amount, match.group(0), context, step_index)
+        _record_reading(
+            temperatures, seen, int(match.group(1)),
+            match.group(2) or match.group(3) or "C",
+            match.group(0), text, match.start(), step_index,
+        )
+    # "350 degrees" defaults to Fahrenheit; recipes using just "180°" are Celsius.
+    for match in _SPELLED_TEMPERATURE_RE.finditer(text):
+        _record_reading(
+            temperatures, seen, int(match.group(1)),
+            match.group(2) or match.group(3) or "F",
+            match.group(0), text, match.start(), step_index,
+        )
     for match in _GAS_MARK_RE.finditer(text):
         values = _GAS_MARK.get(int(match.group(1)))
         if values is not None:
             _add_temperature(temperatures, seen, values[0], values[1], match.group(0), _sentence_at(text, match.start()), step_index)
+
+
+def _record_reading(temperatures, seen, amount, unit, raw, text, position, step_index):
+    if unit.upper().startswith("C"):
+        _add_temperature(temperatures, seen, amount, round(amount * 9 / 5 + 32), raw, _sentence_at(text, position), step_index)
+    else:
+        _add_temperature(temperatures, seen, round((amount - 32) * 5 / 9), amount, raw, _sentence_at(text, position), step_index)
 
 
 def _sentence_at(text, position):

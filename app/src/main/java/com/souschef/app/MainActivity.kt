@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,6 +45,7 @@ import com.souschef.app.ui.recipe.RecipeScreen
 import com.souschef.app.ui.recipe.RecipeTab
 import com.souschef.app.ui.recipe.RecipeViewModel
 import com.souschef.app.ui.theme.SousChefTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -113,12 +115,15 @@ private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewMo
                 )
                 val recipes by libraryViewModel.recipes.collectAsStateWithLifecycle()
                 val uncheckedCount by libraryViewModel.uncheckedShoppingCount.collectAsStateWithLifecycle()
+                val customCategories by container.settings.customCategories
+                    .collectAsStateWithLifecycle(emptyList())
                 LibraryScreen(
                     recipes = recipes,
                     uncheckedShoppingCount = uncheckedCount,
                     onOpenRecipe = { id -> navController.navigate("recipe/$id") },
                     onOpenShopping = { navController.navigate("shopping") },
                     onPasteLink = { pasteLinkOpen = true },
+                    customCategories = customCategories,
                 )
             }
             composable("recipe/{id}") { entry ->
@@ -130,6 +135,11 @@ private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewMo
                 )
                 val recipe by recipeViewModel.recipe.collectAsStateWithLifecycle()
                 val shopping by recipeViewModel.shopping.collectAsStateWithLifecycle()
+                val keepScreenAwake by container.settings.keepScreenAwake
+                    .collectAsStateWithLifecycle(initialValue = true)
+                val customCategories by container.settings.customCategories
+                    .collectAsStateWithLifecycle(emptyList())
+                val scope = rememberCoroutineScope()
                 val addedShoppingTexts = remember(shopping, recipeId) {
                     shopping.filter { it.recipeId == recipeId }
                         .mapTo(HashSet()) { it.text.trim() }
@@ -150,6 +160,15 @@ private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewMo
                         onAddToShopping = recipeViewModel::addToShopping,
                         onOpenShopping = { navController.navigate("shopping") },
                         shoppingCount = shopping.size,
+                        keepScreenAwake = keepScreenAwake,
+                        onKeepScreenAwakeChange = { enabled ->
+                            scope.launch { container.settings.setKeepScreenAwake(enabled) }
+                        },
+                        customCategories = customCategories,
+                        onCategoryChange = recipeViewModel::setCategory,
+                        onAddCategory = { name ->
+                            scope.launch { container.settings.addCategory(name) }
+                        },
                     )
                 }
             }
@@ -167,9 +186,9 @@ private fun SousChefNavHost(container: AppContainer, shareViewModel: ShareViewMo
                         recipe = current,
                         saving = saving,
                         onCancel = { navController.popBackStack() },
-                        onSave = { edited ->
+                        onSave = { edited, refresh ->
                             saving = true
-                            recipeViewModel.saveEdited(edited) { result ->
+                            recipeViewModel.saveEdited(edited, refresh) { result ->
                                 saving = false
                                 if (result == RecipeViewModel.SAVE_FAILED) {
                                     // Nothing was written; stay on the form so the edits survive.

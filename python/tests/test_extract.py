@@ -67,6 +67,19 @@ def test_temperature_variants():
     assert {177, 180}.issubset(by_c)
 
 
+def test_temperature_spelled_units():
+    temps = json.loads(temperatures_from_texts([
+        "Heat the oven to 350 degrees Fahrenheit.",
+        "Bake at 180 degrees Celsius.",
+        "Roast at 400 degrees.",
+    ]))
+    assert [(t["valueC"], t["valueF"]) for t in temps] == [
+        (177, 350),
+        (180, 356),
+        (204, 400),
+    ]
+
+
 def test_gas_mark_uses_specified_fahrenheit():
     temps = json.loads(temperatures_from_texts(["Gas mark 4."]))
     assert temps[0]["valueC"] == 180

@@ -102,15 +102,15 @@ private fun TemperatureCard(
     ) {
         Row {
             Text(
-                text = temperature.valueC?.let { "$it°C" } ?: formatTemperature(temperature),
+                text = temperature.valueF?.let { "$it°F" } ?: formatTemperature(temperature),
                 style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.alignByBaseline(),
             )
-            if (temperature.valueC != null && temperature.valueF != null) {
+            if (temperature.valueF != null && temperature.valueC != null) {
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "/ ${temperature.valueF}°F",
+                    text = "/ ${temperature.valueC}°C",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.alignByBaseline(),

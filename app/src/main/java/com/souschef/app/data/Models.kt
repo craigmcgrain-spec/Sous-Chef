@@ -38,7 +38,11 @@ data class Recipe(
     val steps: List<Step>,
     val temperatures: List<Temperature>,
     val savedAtEpochMs: Long,
+    /** [RecipeCategory] name, or null for recipes saved before categories existed. */
+    val category: String? = null,
 )
+
+enum class RecipeCategory { Appetizers, Sides, Mains, Dessert, Snacks }
 
 @Serializable data class Ingredient(val id: String, val text: String, val checked: Boolean)
 @Serializable data class Step(val id: String, val text: String, val checked: Boolean)

@@ -41,7 +41,7 @@ class EditRecipeScreenTest {
     @Test
     fun blank_title_blocks_save() {
         var saved: Recipe? = null
-        setEditScreen(sampleRecipe(), onSave = { saved = it })
+        setEditScreen(sampleRecipe(), onSave = { recipe, _ -> saved = recipe })
 
         field(0).performTextClearance()
         composeRule.onNodeWithText("Save").performClick()
@@ -53,7 +53,7 @@ class EditRecipeScreenTest {
     @Test
     fun edits_title_and_steps() {
         var saved: Recipe? = null
-        setEditScreen(sampleRecipe(), onSave = { saved = it })
+        setEditScreen(sampleRecipe(), onSave = { recipe, _ -> saved = recipe })
 
         field(0).performTextClearance()
         field(0).performTextInput("Sunday Ragù, revised")
@@ -76,6 +76,29 @@ class EditRecipeScreenTest {
     }
 
     @Test
+    fun adds_a_fahrenheit_temperature_by_hand() {
+        var saved: Recipe? = null
+        var refresh: Boolean? = null
+        setEditScreen(
+            sampleRecipe().copy(temperatures = emptyList()),
+            onSave = { recipe, refreshTemperatures ->
+                saved = recipe
+                refresh = refreshTemperatures
+            },
+        )
+
+        composeRule.onNodeWithText("+ Add temperature").performScrollTo().performClick()
+        field(9).performScrollTo().performTextInput("400")
+        field(10).performScrollTo().performTextInput("Roast the chicken")
+        composeRule.onNodeWithText("Save").performClick()
+
+        assertEquals(400, saved?.temperatures?.single()?.valueF)
+        assertEquals(204, saved?.temperatures?.single()?.valueC)
+        assertEquals("Roast the chicken", saved?.temperatures?.single()?.context)
+        assertEquals(false, refresh)
+    }
+
+    @Test
     fun reorder_keeps_checked_state() {
         val recipe = sampleRecipe().copy(
             steps = listOf(
@@ -84,7 +107,7 @@ class EditRecipeScreenTest {
             ),
         )
         var saved: Recipe? = null
-        setEditScreen(recipe, onSave = { saved = it })
+        setEditScreen(recipe, onSave = { recipe, _ -> saved = recipe })
 
         composeRule.onNodeWithContentDescription("Reorder step A")
             .performScrollTo()
@@ -100,7 +123,7 @@ class EditRecipeScreenTest {
     @Test
     fun drag_handle_reorders_rows() {
         var saved: Recipe? = null
-        setEditScreen(sampleRecipe(), onSave = { saved = it })
+        setEditScreen(sampleRecipe(), onSave = { recipe, _ -> saved = recipe })
 
         composeRule.onNodeWithContentDescription("Reorder step Heat the oven to 160°C.")
             .performScrollTo()
@@ -132,7 +155,7 @@ class EditRecipeScreenTest {
             ),
         )
         var saved: Recipe? = null
-        setEditScreen(recipe, onSave = { saved = it })
+        setEditScreen(recipe, onSave = { recipe, _ -> saved = recipe })
 
         val handle = composeRule.onNodeWithContentDescription("Reorder step A").performScrollTo()
         handle.performTouchInput { down(center) }
@@ -229,7 +252,7 @@ class EditRecipeScreenTest {
         recipe: Recipe,
         saving: Boolean = false,
         onCancel: () -> Unit = {},
-        onSave: (Recipe) -> Unit = {},
+        onSave: (Recipe, Boolean) -> Unit = { _, _ -> },
         onBackReached: (() -> Unit)? = null,
     ) {
         composeRule.setContent {

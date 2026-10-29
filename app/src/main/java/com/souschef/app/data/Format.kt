@@ -13,8 +13,8 @@ fun formatDuration(minutes: Int?): String? {
 
 fun formatTemperature(t: Temperature): String {
     val parts = listOfNotNull(
-        t.valueC?.let { "$it°C" },
         t.valueF?.let { "$it°F" },
+        t.valueC?.let { "$it°C" },
     )
     return if (parts.isEmpty()) t.raw else parts.joinToString(" / ")
 }

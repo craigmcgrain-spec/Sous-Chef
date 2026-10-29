@@ -7,8 +7,11 @@ temperatures, and Shopping.
 
 Ingredients and steps can be ticked off while cooking and the ticks survive a
 restart. Recipes can be corrected after import (title, servings, times,
-ingredients, steps, reorder), and ingredients can be added to one shopping list
-shared across recipes. Saved recipes open offline.
+ingredients, steps, reorder, oven temperatures), filed into built-in or custom
+categories from the recipe screen, and linked back to their source page. The
+screen stays awake while a recipe is open, which can be turned off in the
+recipe's overflow menu. Ingredients can be added to one shopping list shared
+across recipes. Saved recipes open offline.
 
 Requires Android 13 (API 33) or newer.
 

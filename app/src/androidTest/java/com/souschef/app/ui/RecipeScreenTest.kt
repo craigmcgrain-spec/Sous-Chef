@@ -14,12 +14,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.souschef.app.data.Recipe
 import com.souschef.app.data.Step
@@ -95,6 +97,29 @@ class RecipeScreenTest {
     }
 
     @Test
+    fun category_changes_from_the_recipe_header_and_custom_categories_can_be_added() {
+        var selected: String? = null
+        var added: String? = null
+        setRecipeScreen(
+            sampleRecipe(),
+            onCategoryChange = { selected = it },
+            onAddCategory = { added = it },
+        )
+
+        composeRule.onNodeWithText("Uncategorized").performClick()
+        composeRule.onNodeWithText("Mains").performClick()
+        assertEquals("Mains", selected)
+
+        composeRule.onNodeWithText("Uncategorized").performClick()
+        composeRule.onNodeWithText("New category…").performClick()
+        composeRule.onNode(hasSetTextAction()).performTextInput("Weeknight")
+        composeRule.onNodeWithText("Add").performClick()
+
+        assertEquals("Weeknight", added)
+        assertEquals("Weeknight", selected)
+    }
+
+    @Test
     fun delete_asks_for_confirmation() {
         var deleted = false
         setRecipeScreen(sampleRecipe(), onDelete = { deleted = true })
@@ -103,6 +128,17 @@ class RecipeScreenTest {
         composeRule.onNodeWithText("Delete this recipe?").assertIsDisplayed()
         composeRule.onNodeWithText("Delete").performClick()
         assertTrue(deleted)
+    }
+
+    @Test
+    fun source_url_is_shown_and_keep_awake_can_be_toggled() {
+        var keepAwake: Boolean? = null
+        setRecipeScreen(sampleRecipe(), onKeepScreenAwakeChange = { keepAwake = it })
+
+        composeRule.onNodeWithText("https://example.com/r").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("More options").performClick()
+        composeRule.onNodeWithText("Keep screen awake").performClick()
+        assertEquals(false, keepAwake)
     }
 
     @Test
@@ -143,7 +179,7 @@ class RecipeScreenTest {
             initialTab = RecipeTab.Times,
             onJumpToStep = { jumped = it },
         )
-        composeRule.onNodeWithText("Step 1").performClick()
+        composeRule.onNodeWithText("Step 1").performScrollTo().performClick()
         assertEquals(0, jumped)
         composeRule.onNodeWithText("STEPS").assertIsSelected()
         composeRule.onNodeWithText("Heat the oven to 160°C.").assertIsDisplayed()
@@ -160,15 +196,15 @@ class RecipeScreenTest {
             ),
             initialTab = RecipeTab.Times,
         )
-        composeRule.onNodeWithText("Step 10").performClick()
+        composeRule.onNodeWithText("Step 10").performScrollTo().performClick()
         composeRule.onNodeWithText("Step number 10 does something.").assertIsDisplayed()
     }
 
     @Test
-    fun temperature_shows_fahrenheit_as_secondary() {
+    fun temperature_shows_fahrenheit_as_primary() {
         setRecipeScreen(sampleRecipe(), initialTab = RecipeTab.Times)
-        composeRule.onNodeWithText("160°C").assertIsDisplayed()
-        composeRule.onNodeWithText("/ 320°F").assertIsDisplayed()
+        composeRule.onNodeWithText("320°F").assertIsDisplayed()
+        composeRule.onNodeWithText("/ 160°C").assertIsDisplayed()
         composeRule.onNodeWithText("160°C / 320°F").assertDoesNotExist()
     }
 
@@ -207,8 +243,8 @@ class RecipeScreenTest {
         )
         composeRule.onNodeWithText("Add all ingredients").performClick()
         assertEquals(listOf("2 tbsp olive oil", "1kg beef shin"), added)
-        composeRule.onNodeWithText("2 items on the shopping list").assertIsDisplayed()
-        composeRule.onNodeWithText("View list").performClick()
+        composeRule.onNodeWithText("2 items on the shopping list").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("View list").performScrollTo().performClick()
         assertTrue(opened)
     }
 
@@ -239,6 +275,9 @@ class RecipeScreenTest {
         onAddToShopping: (List<String>) -> Unit = {},
         onOpenShopping: () -> Unit = {},
         shoppingCount: Int = 0,
+        onKeepScreenAwakeChange: (Boolean) -> Unit = {},
+        onCategoryChange: (String?) -> Unit = {},
+        onAddCategory: (String) -> Unit = {},
     ): MutableState<Recipe> {
         val current = mutableStateOf(recipe)
         composeRule.setContent {
@@ -275,6 +314,9 @@ class RecipeScreenTest {
                     onAddToShopping = onAddToShopping,
                     onOpenShopping = onOpenShopping,
                     shoppingCount = shoppingCount,
+                    onKeepScreenAwakeChange = onKeepScreenAwakeChange,
+                    onCategoryChange = onCategoryChange,
+                    onAddCategory = onAddCategory,
                 )
             }
         }
